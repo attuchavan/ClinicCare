@@ -1,0 +1,800 @@
+rules_version = '2';
+
+// ===============================================================
+// Assumed Data Model
+// ===============================================================
+//
+// This security rules file assumes the following data structures:
+//
+// 1. Collection: users
+//    Document ID: {userId} (Auth UID)
+//    Fields:
+//      - id: string (optional, 1..128 chars, matches document ID if present)
+//      - uid: string (optional, 1..128 chars, matches request.auth.uid)
+//      - clinicId: string (required, 1..128 chars, immutable)
+//      - name: string (required, 1..100 chars)
+//      - email: string (required, 5..100 chars, valid email format)
+//      - role: string (required, 'doctor' | 'receptionist')
+//      - phone: string (optional, max 25 chars)
+//      - status: string (required, 'active' | 'inactive')
+//      - createdAt: timestamp or ISO string (optional, immutable)
+//      - updatedAt: timestamp or ISO string (optional)
+//
+// 2. Collection: patients
+//    Document ID: {patientId}
+//    Fields:
+//      - id: string (optional, 1..128 chars, matches document ID if present)
+//      - clinicId: string (required, 1..128 chars, immutable)
+//      - patientCode: string (optional, max 50 chars)
+//      - name: string (required, 1..100 chars)
+//      - age: number (required, 0..150)
+//      - gender: string (required, 'male' | 'female' | 'other')
+//      - phone: string (required, 7..25 chars)
+//      - email: string (optional, max 100 chars)
+//      - address: string (optional, max 500 chars)
+//      - emergencyContact: string or map (optional)
+//      - medicalHistory: string or list (optional)
+//      - allergies: string or list (optional)
+//      - bloodGroup: string (optional, valid blood group enum)
+//      - createdBy: string (optional, max 128 chars)
+//      - lastVisit: timestamp or ISO string (optional)
+//      - createdAt: timestamp or ISO string (optional, immutable)
+//      - updatedAt: timestamp or ISO string (optional)
+//
+// 3. Collection: appointments
+//    Document ID: {appointmentId}
+//    Fields:
+//      - id: string (optional, 1..128 chars, matches document ID if present)
+//      - clinicId: string (required, 1..128 chars, immutable)
+//      - patientId: string (required, 1..128 chars, immutable)
+//      - patientName: string (required, 1..100 chars)
+//      - patientPhone: string (required, 7..25 chars)
+//      - date: string (required, 8..30 chars, YYYY-MM-DD or ISO)
+//      - timeSlot: string (required, 3..20 chars)
+//      - status: string (required, 'requested' | 'scheduled' | 'confirmed' | 'in-progress' | 'completed' | 'cancelled' | 'no-show')
+//      - reason: string (optional, max 500 chars)
+//      - type: string (optional, 'new' | 'follow-up' | 'emergency' | 'routine' | 'consultation')
+//      - tokenNumber: number (optional, 0..10000)
+//      - bookedVia: string (optional, 'online' | 'reception' | 'phone' | 'patient_portal' | 'walk-in')
+//      - cancelledReason: string (optional, max 500 chars)
+//      - notes: string (optional, max 1000 chars)
+//      - createdAt: timestamp or ISO string (optional, immutable)
+//      - updatedAt: timestamp or ISO string (optional)
+//
+// 4. Collection: consultations
+//    Document ID: {consultationId}
+//    Fields:
+//      - id: string (optional, 1..128 chars, matches document ID if present)
+//      - clinicId: string (required, 1..128 chars, immutable)
+//      - appointmentId: string (optional, max 128 chars)
+//      - patientId: string (required, 1..128 chars, immutable)
+//      - doctorId: string (required, 1..128 chars)
+//      - doctorName: string (optional, max 100 chars)
+//      - date: string (required, 8..30 chars)
+//      - vitals: map (optional, max 20 keys)
+//      - symptoms: string or list (optional)
+//      - diagnosis: string (required, 1..1000 chars)
+//      - clinicalNotes: string (optional, max 5000 chars)
+//      - followUpRequired: bool (optional)
+//      - followUpDate: string (optional, max 30 chars)
+//      - createdAt: timestamp or ISO string (optional, immutable)
+//      - updatedAt: timestamp or ISO string (optional)
+//
+// 5. Collection: prescriptions
+//    Document ID: {prescriptionId}
+//    Fields:
+//      - id: string (optional, 1..128 chars, matches document ID if present)
+//      - clinicId: string (required, 1..128 chars, immutable)
+//      - consultationId: string (required, 1..128 chars, immutable)
+//      - appointmentId: string (optional, max 128 chars)
+//      - patientId: string (required, 1..128 chars, immutable)
+//      - doctorId: string (required, 1..128 chars)
+//      - doctorName: string (optional, max 100 chars)
+//      - date: string (required, 8..30 chars)
+//      - medicines: list (required, 1..50 items)
+//      - advice: string (optional, max 2000 chars)
+//      - version: number (required, >= 1, versioning protected)
+//      - isLatest: bool (required)
+//      - previousVersionId: string (optional, max 128 chars)
+//      - pdfUrl: string (optional, valid URL, max 1000 chars)
+//      - createdAt: timestamp or ISO string (optional, immutable)
+//      - updatedAt: timestamp or ISO string (optional)
+//
+// 6. Collection: medicalDocuments
+//    Document ID: {documentId}
+//    Fields:
+//      - id: string (optional, 1..128 chars, matches document ID if present)
+//      - clinicId: string (required, 1..128 chars, immutable)
+//      - patientId: string (required, 1..128 chars, immutable)
+//      - title: string (required, 1..200 chars)
+//      - documentType: string (required, 'lab_report' | 'prescription' | 'xray' | 'scan' | 'discharge_summary' | 'other')
+//      - category: string (optional, max 100 chars)
+//      - fileUrl: string (required, valid URL, max 1000 chars)
+//      - fileSize: number (optional, max 50MB)
+//      - mimeType: string (optional, max 100 chars)
+//      - uploadedBy: string (required, 1..128 chars)
+//      - uploaderRole: string (optional, 'doctor' | 'receptionist')
+//      - consultationId: string (optional, max 128 chars)
+//      - notes: string (optional, max 1000 chars)
+//      - createdAt: timestamp or ISO string (optional, immutable)
+//      - updatedAt: timestamp or ISO string (optional)
+//
+// 7. Collection: bills
+//    Document ID: {billId}
+//    Fields:
+//      - id: string (optional, 1..128 chars, matches document ID if present)
+//      - clinicId: string (required, 1..128 chars, immutable)
+//      - patientId: string (required, 1..128 chars, immutable)
+//      - appointmentId: string (optional, max 128 chars)
+//      - consultationId: string (optional, max 128 chars)
+//      - billNumber: string (required, 1..50 chars, immutable for staff updates)
+//      - items: list (required, 1..50 items, immutable for receptionist)
+//      - subtotal: number (required, >= 0, immutable for receptionist)
+//      - discount: number (optional, >= 0, immutable for receptionist)
+//      - tax: number (optional, >= 0, immutable for receptionist)
+//      - totalAmount: number (required, >= 0, immutable for receptionist)
+//      - paidAmount: number (required, >= 0)
+//      - balanceAmount: number (required, >= 0)
+//      - paymentStatus: string (required, 'pending' | 'partially_paid' | 'paid' | 'refunded')
+//      - paymentMethod: string (optional, 'cash' | 'upi' | 'card' | 'online' | 'netbanking' | 'pending' | '')
+//      - receiptNumber: string (optional, max 50 chars)
+//      - notes: string (optional, max 500 chars)
+//      - createdBy: string (optional, max 128 chars)
+//      - createdAt: timestamp or ISO string (optional, immutable)
+//      - updatedAt: timestamp or ISO string (optional)
+//
+// 8. Collection: notifications
+//    Document ID: {notificationId}
+//    Fields:
+//      - id: string (optional, 1..128 chars, matches document ID if present)
+//      - clinicId: string (required, 1..128 chars, immutable)
+//      - recipientPhone: string (required, 7..25 chars)
+//      - recipientName: string (optional, max 100 chars)
+//      - patientId: string (optional, max 128 chars)
+//      - type: string (required, 'appointment_reminder' | 'prescription_ready' | 'follow_up' | 'payment_receipt' | 'general')
+//      - channel: string (required, 'whatsapp' | 'sms' | 'email')
+//      - status: string (required, 'queued' | 'sent' | 'delivered' | 'failed' | 'cancelled')
+//      - payload: map (optional, max 30 keys)
+//      - attempts: number (optional, 0..20)
+//      - errorMessage: string (optional, max 1000 chars)
+//      - scheduledFor: timestamp or ISO string (optional)
+//      - sentAt: timestamp or ISO string (optional)
+//      - createdAt: timestamp or ISO string (optional, immutable)
+//      - updatedAt: timestamp or ISO string (optional)
+//
+// 9. Collection: followUps
+//    Document ID: {followUpId}
+//    Fields:
+//      - id: string (optional, 1..128 chars, matches document ID if present)
+//      - clinicId: string (required, 1..128 chars, immutable)
+//      - patientId: string (required, 1..128 chars, immutable)
+//      - patientName: string (required, 1..100 chars)
+//      - patientPhone: string (required, 7..25 chars)
+//      - consultationId: string (optional, max 128 chars)
+//      - doctorId: string (required, 1..128 chars)
+//      - followUpDate: string (required, 8..30 chars)
+//      - status: string (required, 'pending' | 'completed' | 'cancelled' | 'missed')
+//      - notes: string (optional, max 500 chars)
+//      - reminderSent: bool (optional)
+//      - createdAt: timestamp or ISO string (optional, immutable)
+//      - updatedAt: timestamp or ISO string (optional)
+//
+// 10. Collection: clinicSettings
+//     Document ID: {settingId}
+//     Fields:
+//       - id: string (optional, 1..128 chars, matches document ID if present)
+//       - clinicId: string (required, 1..128 chars, immutable)
+//       - name: string (required, 1..150 chars)
+//       - doctorName: string (required, 1..100 chars)
+//       - doctorRegNo: string (required, 1..50 chars)
+//       - tagline: string (optional, max 200 chars)
+//       - phone: string (required, 7..25 chars)
+//       - email: string (required, 5..100 chars, valid email format)
+//       - address: string (optional, max 500 chars)
+//       - consultationFee: number (required, >= 0)
+//       - followUpValidityDays: number (optional, 0..365)
+//       - workingHours: map (optional, max 10 keys)
+//       - slotDurationMinutes: number (optional, 5..120)
+//       - createdAt: timestamp or ISO string (optional, immutable)
+//       - updatedAt: timestamp or ISO string (optional)
+//
+// 11. Collection: auditLogs
+//     Document ID: {logId}
+//     Fields:
+//       - id: string (optional, 1..128 chars, matches document ID if present)
+//       - clinicId: string (required, 1..128 chars, immutable)
+//       - actorId: string (required, 1..128 chars)
+//       - actorName: string (required, 1..100 chars)
+//       - actorRole: string (required, 'doctor' | 'receptionist' | 'system' | 'admin')
+//       - action: string (required, 1..100 chars)
+//       - resourceType: string (required, 1..100 chars)
+//       - resourceId: string (required, 1..128 chars)
+//       - details: map (optional, max 50 keys)
+//       - ipAddress: string (optional, max 50 chars)
+//       - timestamp: timestamp or ISO string (required)
+//       - createdAt: timestamp or ISO string (optional, immutable)
+//
+// ===============================================================
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // ===============================================================
+    // Core Helper Functions
+    // ===============================================================
+
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    function isOwner(userId) {
+      return isAuthenticated() && request.auth.uid == userId;
+    }
+
+    function isMatchingId(docId) {
+      return !('id' in request.resource.data) || request.resource.data.id == docId;
+    }
+
+    function hasUserDoc() {
+      return exists(/databases/$(database)/documents/users/$(request.auth.uid));
+    }
+
+    function getUserData() {
+      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data;
+    }
+
+    // Role-based authorization verifying clinic isolation
+    function isDoctor(clinicId) {
+      return isAuthenticated() && (
+        ('role' in request.auth.token && request.auth.token.role == 'doctor' &&
+         'clinicId' in request.auth.token && request.auth.token.clinicId == clinicId) ||
+        (hasUserDoc() &&
+         'clinicId' in getUserData() && getUserData().clinicId == clinicId &&
+         'role' in getUserData() && getUserData().role == 'doctor' &&
+         'status' in getUserData() && getUserData().status == 'active')
+      );
+    }
+
+    function isReceptionist(clinicId) {
+      return isAuthenticated() && (
+        ('role' in request.auth.token && request.auth.token.role == 'receptionist' &&
+         'clinicId' in request.auth.token && request.auth.token.clinicId == clinicId) ||
+        (hasUserDoc() &&
+         'clinicId' in getUserData() && getUserData().clinicId == clinicId &&
+         'role' in getUserData() && getUserData().role == 'receptionist' &&
+         'status' in getUserData() && getUserData().status == 'active')
+      );
+    }
+
+    function isStaff(clinicId) {
+      return isDoctor(clinicId) || isReceptionist(clinicId);
+    }
+
+    // Schema and field utilities
+    function hasRequiredFields(data, fields) {
+      return data.keys().hasAll(fields);
+    }
+
+    function hasOnlyAllowedFields(data, fields) {
+      return data.keys().hasOnly(fields);
+    }
+
+    function areImmutableFieldsUnchanged(fields) {
+      return !request.resource.data.diff(resource.data).affectedKeys().hasAny(fields);
+    }
+
+    // String, email, url, date type validators
+    function isValidEmail(email) {
+      return email is string &&
+        email.size() >= 5 &&
+        email.size() <= 100 &&
+        email.matches("^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}$");
+    }
+
+    function isValidUrl(url) {
+      return url is string &&
+        url.size() >= 8 &&
+        url.size() <= 1000 &&
+        (url.matches("^https?://.*") || url.matches("^gs://.*"));
+    }
+
+    function isValidDate(val) {
+      return val is timestamp || (val is string && val.size() >= 8 && val.size() <= 40);
+    }
+
+    // ===============================================================
+    // Domain Validators
+    // ===============================================================
+
+    // 1. User validator
+    function isValidUser(data) {
+      let allowedFields = ['id', 'uid', 'clinicId', 'name', 'email', 'role', 'phone', 'status', 'createdAt', 'updatedAt'];
+      let requiredFields = ['clinicId', 'name', 'email', 'role', 'status'];
+
+      return hasRequiredFields(data, requiredFields) &&
+             hasOnlyAllowedFields(data, allowedFields) &&
+             (!('id' in data) || (data.id is string && data.id.size() >= 1 && data.id.size() <= 128)) &&
+             (!('uid' in data) || (data.uid is string && data.uid.size() >= 1 && data.uid.size() <= 128)) &&
+             data.clinicId is string && data.clinicId.size() >= 1 && data.clinicId.size() <= 128 &&
+             data.name is string && data.name.size() >= 1 && data.name.size() <= 100 &&
+             isValidEmail(data.email) &&
+             data.role in ['doctor', 'receptionist'] &&
+             data.status in ['active', 'inactive'] &&
+             (!('phone' in data) || (data.phone is string && data.phone.size() <= 25)) &&
+             (!('createdAt' in data) || isValidDate(data.createdAt)) &&
+             (!('updatedAt' in data) || isValidDate(data.updatedAt));
+    }
+
+    // 2. Patient validator
+    function isValidPatient(data) {
+      let allowedFields = ['id', 'clinicId', 'patientCode', 'name', 'age', 'gender', 'phone', 'email', 'address', 'emergencyContact', 'medicalHistory', 'allergies', 'bloodGroup', 'createdAt', 'updatedAt', 'createdBy', 'lastVisit'];
+      let requiredFields = ['clinicId', 'name', 'age', 'gender', 'phone'];
+
+      return hasRequiredFields(data, requiredFields) &&
+             hasOnlyAllowedFields(data, allowedFields) &&
+             (!('id' in data) || (data.id is string && data.id.size() >= 1 && data.id.size() <= 128)) &&
+             data.clinicId is string && data.clinicId.size() >= 1 && data.clinicId.size() <= 128 &&
+             (!('patientCode' in data) || (data.patientCode is string && data.patientCode.size() <= 50)) &&
+             data.name is string && data.name.size() >= 1 && data.name.size() <= 100 &&
+             data.age is number && data.age >= 0 && data.age <= 150 &&
+             data.gender in ['male', 'female', 'other'] &&
+             data.phone is string && data.phone.size() >= 7 && data.phone.size() <= 25 &&
+             (!('email' in data) || (data.email is string && data.email.size() <= 100 && (data.email == '' || isValidEmail(data.email)))) &&
+             (!('address' in data) || (data.address is string && data.address.size() <= 500)) &&
+             (!('emergencyContact' in data) || (data.emergencyContact is string && data.emergencyContact.size() <= 200) || (data.emergencyContact is map && data.emergencyContact.size() <= 10)) &&
+             (!('medicalHistory' in data) || (data.medicalHistory is string && data.medicalHistory.size() <= 2000) || (data.medicalHistory is list && data.medicalHistory.size() <= 50)) &&
+             (!('allergies' in data) || (data.allergies is string && data.allergies.size() <= 1000) || (data.allergies is list && data.allergies.size() <= 50)) &&
+             (!('bloodGroup' in data) || (data.bloodGroup is string && data.bloodGroup in ['A+', 'A-', 'B+', 'B-', 'AB+', 'AB-', 'O+', 'O-', 'Unknown', ''])) &&
+             (!('createdBy' in data) || (data.createdBy is string && data.createdBy.size() <= 128)) &&
+             (!('lastVisit' in data) || isValidDate(data.lastVisit)) &&
+             (!('createdAt' in data) || isValidDate(data.createdAt)) &&
+             (!('updatedAt' in data) || isValidDate(data.updatedAt));
+    }
+
+    // 3. Appointment validator
+    function isValidAppointment(data) {
+      let allowedFields = ['id', 'clinicId', 'patientId', 'patientName', 'patientPhone', 'date', 'timeSlot', 'status', 'reason', 'type', 'tokenNumber', 'bookedVia', 'createdAt', 'updatedAt', 'cancelledReason', 'notes'];
+      let requiredFields = ['clinicId', 'patientId', 'patientName', 'patientPhone', 'date', 'timeSlot', 'status'];
+
+      return hasRequiredFields(data, requiredFields) &&
+             hasOnlyAllowedFields(data, allowedFields) &&
+             (!('id' in data) || (data.id is string && data.id.size() >= 1 && data.id.size() <= 128)) &&
+             data.clinicId is string && data.clinicId.size() >= 1 && data.clinicId.size() <= 128 &&
+             data.patientId is string && data.patientId.size() >= 1 && data.patientId.size() <= 128 &&
+             data.patientName is string && data.patientName.size() >= 1 && data.patientName.size() <= 100 &&
+             data.patientPhone is string && data.patientPhone.size() >= 7 && data.patientPhone.size() <= 25 &&
+             data.date is string && data.date.size() >= 8 && data.date.size() <= 30 &&
+             data.timeSlot is string && data.timeSlot.size() >= 3 && data.timeSlot.size() <= 20 &&
+             data.status in ['requested', 'scheduled', 'confirmed', 'in-progress', 'completed', 'cancelled', 'no-show'] &&
+             (!('reason' in data) || (data.reason is string && data.reason.size() <= 500)) &&
+             (!('type' in data) || (data.type in ['new', 'follow-up', 'emergency', 'routine', 'consultation'])) &&
+             (!('tokenNumber' in data) || (data.tokenNumber is number && data.tokenNumber >= 0 && data.tokenNumber <= 10000)) &&
+             (!('bookedVia' in data) || (data.bookedVia in ['online', 'reception', 'phone', 'patient_portal', 'walk-in'])) &&
+             (!('cancelledReason' in data) || (data.cancelledReason is string && data.cancelledReason.size() <= 500)) &&
+             (!('notes' in data) || (data.notes is string && data.notes.size() <= 1000)) &&
+             (!('createdAt' in data) || isValidDate(data.createdAt)) &&
+             (!('updatedAt' in data) || isValidDate(data.updatedAt));
+    }
+
+    // Patient self-service appointment request validator
+    function isValidPatientAppointmentRequest(data) {
+      let patientAllowedFields = ['id', 'clinicId', 'patientId', 'patientName', 'patientPhone', 'date', 'timeSlot', 'status', 'reason', 'type', 'bookedVia', 'createdAt', 'updatedAt'];
+
+      return hasOnlyAllowedFields(data, patientAllowedFields) &&
+             data.patientId == request.auth.uid &&
+             data.status == 'requested' &&
+             isValidAppointment(data);
+    }
+
+    // 4. Consultation validator
+    function isValidConsultation(data) {
+      let allowedFields = ['id', 'clinicId', 'appointmentId', 'patientId', 'doctorId', 'doctorName', 'date', 'vitals', 'symptoms', 'diagnosis', 'clinicalNotes', 'followUpRequired', 'followUpDate', 'createdAt', 'updatedAt'];
+      let requiredFields = ['clinicId', 'patientId', 'doctorId', 'date', 'diagnosis'];
+
+      return hasRequiredFields(data, requiredFields) &&
+             hasOnlyAllowedFields(data, allowedFields) &&
+             (!('id' in data) || (data.id is string && data.id.size() >= 1 && data.id.size() <= 128)) &&
+             data.clinicId is string && data.clinicId.size() >= 1 && data.clinicId.size() <= 128 &&
+             (!('appointmentId' in data) || (data.appointmentId is string && data.appointmentId.size() <= 128)) &&
+             data.patientId is string && data.patientId.size() >= 1 && data.patientId.size() <= 128 &&
+             data.doctorId is string && data.doctorId.size() >= 1 && data.doctorId.size() <= 128 &&
+             (!('doctorName' in data) || (data.doctorName is string && data.doctorName.size() <= 100)) &&
+             data.date is string && data.date.size() >= 8 && data.date.size() <= 30 &&
+             (!('vitals' in data) || (data.vitals is map && data.vitals.size() <= 20)) &&
+             (!('symptoms' in data) || (data.symptoms is string && data.symptoms.size() <= 1000) || (data.symptoms is list && data.symptoms.size() <= 50)) &&
+             data.diagnosis is string && data.diagnosis.size() >= 1 && data.diagnosis.size() <= 1000 &&
+             (!('clinicalNotes' in data) || (data.clinicalNotes is string && data.clinicalNotes.size() <= 5000)) &&
+             (!('followUpRequired' in data) || (data.followUpRequired is bool)) &&
+             (!('followUpDate' in data) || (data.followUpDate is string && data.followUpDate.size() <= 30)) &&
+             (!('createdAt' in data) || isValidDate(data.createdAt)) &&
+             (!('updatedAt' in data) || isValidDate(data.updatedAt));
+    }
+
+    // 5. Prescription validator
+    function isValidPrescription(data) {
+      let allowedFields = ['id', 'clinicId', 'consultationId', 'appointmentId', 'patientId', 'doctorId', 'doctorName', 'date', 'medicines', 'advice', 'version', 'isLatest', 'previousVersionId', 'pdfUrl', 'createdAt', 'updatedAt'];
+      let requiredFields = ['clinicId', 'consultationId', 'patientId', 'doctorId', 'date', 'medicines', 'version', 'isLatest'];
+
+      return hasRequiredFields(data, requiredFields) &&
+             hasOnlyAllowedFields(data, allowedFields) &&
+             (!('id' in data) || (data.id is string && data.id.size() >= 1 && data.id.size() <= 128)) &&
+             data.clinicId is string && data.clinicId.size() >= 1 && data.clinicId.size() <= 128 &&
+             data.consultationId is string && data.consultationId.size() >= 1 && data.consultationId.size() <= 128 &&
+             (!('appointmentId' in data) || (data.appointmentId is string && data.appointmentId.size() <= 128)) &&
+             data.patientId is string && data.patientId.size() >= 1 && data.patientId.size() <= 128 &&
+             data.doctorId is string && data.doctorId.size() >= 1 && data.doctorId.size() <= 128 &&
+             (!('doctorName' in data) || (data.doctorName is string && data.doctorName.size() <= 100)) &&
+             data.date is string && data.date.size() >= 8 && data.date.size() <= 30 &&
+             data.medicines is list && data.medicines.size() >= 1 && data.medicines.size() <= 50 &&
+             (!('advice' in data) || (data.advice is string && data.advice.size() <= 2000)) &&
+             data.version is number && data.version >= 1 && data.version <= 1000 &&
+             data.isLatest is bool &&
+             (!('previousVersionId' in data) || (data.previousVersionId is string && data.previousVersionId.size() <= 128)) &&
+             (!('pdfUrl' in data) || isValidUrl(data.pdfUrl)) &&
+             (!('createdAt' in data) || isValidDate(data.createdAt)) &&
+             (!('updatedAt' in data) || isValidDate(data.updatedAt));
+    }
+
+    // 6. Medical Document validator
+    function isValidMedicalDocument(data) {
+      let allowedFields = ['id', 'clinicId', 'patientId', 'title', 'documentType', 'category', 'fileUrl', 'fileSize', 'mimeType', 'uploadedBy', 'uploaderRole', 'consultationId', 'notes', 'createdAt', 'updatedAt'];
+      let requiredFields = ['clinicId', 'patientId', 'title', 'documentType', 'fileUrl', 'uploadedBy'];
+
+      return hasRequiredFields(data, requiredFields) &&
+             hasOnlyAllowedFields(data, allowedFields) &&
+             (!('id' in data) || (data.id is string && data.id.size() >= 1 && data.id.size() <= 128)) &&
+             data.clinicId is string && data.clinicId.size() >= 1 && data.clinicId.size() <= 128 &&
+             data.patientId is string && data.patientId.size() >= 1 && data.patientId.size() <= 128 &&
+             data.title is string && data.title.size() >= 1 && data.title.size() <= 200 &&
+             data.documentType in ['lab_report', 'prescription', 'xray', 'scan', 'discharge_summary', 'other'] &&
+             (!('category' in data) || (data.category is string && data.category.size() <= 100)) &&
+             isValidUrl(data.fileUrl) &&
+             (!('fileSize' in data) || (data.fileSize is number && data.fileSize >= 0 && data.fileSize <= 50 * 1024 * 1024)) &&
+             (!('mimeType' in data) || (data.mimeType is string && data.mimeType.size() <= 100)) &&
+             data.uploadedBy is string && data.uploadedBy.size() >= 1 && data.uploadedBy.size() <= 128 &&
+             (!('uploaderRole' in data) || (data.uploaderRole in ['doctor', 'receptionist'])) &&
+             (!('consultationId' in data) || (data.consultationId is string && data.consultationId.size() <= 128)) &&
+             (!('notes' in data) || (data.notes is string && data.notes.size() <= 1000)) &&
+             (!('createdAt' in data) || isValidDate(data.createdAt)) &&
+             (!('updatedAt' in data) || isValidDate(data.updatedAt));
+    }
+
+    // 7. Bill validator
+    function isValidBill(data) {
+      let allowedFields = ['id', 'clinicId', 'patientId', 'appointmentId', 'consultationId', 'billNumber', 'items', 'subtotal', 'discount', 'tax', 'totalAmount', 'paidAmount', 'balanceAmount', 'paymentStatus', 'paymentMethod', 'receiptNumber', 'notes', 'createdAt', 'updatedAt', 'createdBy'];
+      let requiredFields = ['clinicId', 'patientId', 'billNumber', 'items', 'subtotal', 'totalAmount', 'paidAmount', 'balanceAmount', 'paymentStatus'];
+
+      return hasRequiredFields(data, requiredFields) &&
+             hasOnlyAllowedFields(data, allowedFields) &&
+             (!('id' in data) || (data.id is string && data.id.size() >= 1 && data.id.size() <= 128)) &&
+             data.clinicId is string && data.clinicId.size() >= 1 && data.clinicId.size() <= 128 &&
+             data.patientId is string && data.patientId.size() >= 1 && data.patientId.size() <= 128 &&
+             (!('appointmentId' in data) || (data.appointmentId is string && data.appointmentId.size() <= 128)) &&
+             (!('consultationId' in data) || (data.consultationId is string && data.consultationId.size() <= 128)) &&
+             data.billNumber is string && data.billNumber.size() >= 1 && data.billNumber.size() <= 50 &&
+             data.items is list && data.items.size() >= 1 && data.items.size() <= 50 &&
+             data.subtotal is number && data.subtotal >= 0 &&
+             (!('discount' in data) || (data.discount is number && data.discount >= 0)) &&
+             (!('tax' in data) || (data.tax is number && data.tax >= 0)) &&
+             data.totalAmount is number && data.totalAmount >= 0 &&
+             data.paidAmount is number && data.paidAmount >= 0 &&
+             data.balanceAmount is number && data.balanceAmount >= 0 &&
+             data.paymentStatus in ['pending', 'partially_paid', 'paid', 'refunded'] &&
+             (!('paymentMethod' in data) || (data.paymentMethod in ['cash', 'upi', 'card', 'online', 'netbanking', 'pending', ''])) &&
+             (!('receiptNumber' in data) || (data.receiptNumber is string && data.receiptNumber.size() <= 50)) &&
+             (!('notes' in data) || (data.notes is string && data.notes.size() <= 500)) &&
+             (!('createdBy' in data) || (data.createdBy is string && data.createdBy.size() <= 128)) &&
+             (!('createdAt' in data) || isValidDate(data.createdAt)) &&
+             (!('updatedAt' in data) || isValidDate(data.updatedAt));
+    }
+
+    // 8. Notification validator
+    function isValidNotification(data) {
+      let allowedFields = ['id', 'clinicId', 'recipientPhone', 'recipientName', 'patientId', 'type', 'channel', 'status', 'payload', 'attempts', 'errorMessage', 'scheduledFor', 'sentAt', 'createdAt', 'updatedAt'];
+      let requiredFields = ['clinicId', 'recipientPhone', 'type', 'channel', 'status'];
+
+      return hasRequiredFields(data, requiredFields) &&
+             hasOnlyAllowedFields(data, allowedFields) &&
+             (!('id' in data) || (data.id is string && data.id.size() >= 1 && data.id.size() <= 128)) &&
+             data.clinicId is string && data.clinicId.size() >= 1 && data.clinicId.size() <= 128 &&
+             data.recipientPhone is string && data.recipientPhone.size() >= 7 && data.recipientPhone.size() <= 25 &&
+             (!('recipientName' in data) || (data.recipientName is string && data.recipientName.size() <= 100)) &&
+             (!('patientId' in data) || (data.patientId is string && data.patientId.size() <= 128)) &&
+             data.type in ['appointment_reminder', 'prescription_ready', 'follow_up', 'payment_receipt', 'general'] &&
+             data.channel in ['whatsapp', 'sms', 'email'] &&
+             data.status in ['queued', 'sent', 'delivered', 'failed', 'cancelled'] &&
+             (!('payload' in data) || (data.payload is map && data.payload.size() <= 30)) &&
+             (!('attempts' in data) || (data.attempts is number && data.attempts >= 0 && data.attempts <= 20)) &&
+             (!('errorMessage' in data) || (data.errorMessage is string && data.errorMessage.size() <= 1000)) &&
+             (!('scheduledFor' in data) || isValidDate(data.scheduledFor)) &&
+             (!('sentAt' in data) || isValidDate(data.sentAt)) &&
+             (!('createdAt' in data) || isValidDate(data.createdAt)) &&
+             (!('updatedAt' in data) || isValidDate(data.updatedAt));
+    }
+
+    // 9. Follow-up validator
+    function isValidFollowUp(data) {
+      let allowedFields = ['id', 'clinicId', 'patientId', 'patientName', 'patientPhone', 'consultationId', 'doctorId', 'followUpDate', 'status', 'notes', 'reminderSent', 'createdAt', 'updatedAt'];
+      let requiredFields = ['clinicId', 'patientId', 'patientName', 'patientPhone', 'doctorId', 'followUpDate', 'status'];
+
+      return hasRequiredFields(data, requiredFields) &&
+             hasOnlyAllowedFields(data, allowedFields) &&
+             (!('id' in data) || (data.id is string && data.id.size() >= 1 && data.id.size() <= 128)) &&
+             data.clinicId is string && data.clinicId.size() >= 1 && data.clinicId.size() <= 128 &&
+             data.patientId is string && data.patientId.size() >= 1 && data.patientId.size() <= 128 &&
+             data.patientName is string && data.patientName.size() >= 1 && data.patientName.size() <= 100 &&
+             data.patientPhone is string && data.patientPhone.size() >= 7 && data.patientPhone.size() <= 25 &&
+             (!('consultationId' in data) || (data.consultationId is string && data.consultationId.size() <= 128)) &&
+             data.doctorId is string && data.doctorId.size() >= 1 && data.doctorId.size() <= 128 &&
+             data.followUpDate is string && data.followUpDate.size() >= 8 && data.followUpDate.size() <= 30 &&
+             data.status in ['pending', 'completed', 'cancelled', 'missed'] &&
+             (!('notes' in data) || (data.notes is string && data.notes.size() <= 500)) &&
+             (!('reminderSent' in data) || (data.reminderSent is bool)) &&
+             (!('createdAt' in data) || isValidDate(data.createdAt)) &&
+             (!('updatedAt' in data) || isValidDate(data.updatedAt));
+    }
+
+    // 10. Clinic Settings validator
+    function isValidClinicSettings(data) {
+      let allowedFields = ['id', 'clinicId', 'name', 'doctorName', 'doctorRegNo', 'tagline', 'phone', 'email', 'address', 'consultationFee', 'followUpValidityDays', 'workingHours', 'slotDurationMinutes', 'createdAt', 'updatedAt'];
+      let requiredFields = ['clinicId', 'name', 'doctorName', 'doctorRegNo', 'phone', 'email', 'consultationFee'];
+
+      return hasRequiredFields(data, requiredFields) &&
+             hasOnlyAllowedFields(data, allowedFields) &&
+             (!('id' in data) || (data.id is string && data.id.size() >= 1 && data.id.size() <= 128)) &&
+             data.clinicId is string && data.clinicId.size() >= 1 && data.clinicId.size() <= 128 &&
+             data.name is string && data.name.size() >= 1 && data.name.size() <= 150 &&
+             data.doctorName is string && data.doctorName.size() >= 1 && data.doctorName.size() <= 100 &&
+             data.doctorRegNo is string && data.doctorRegNo.size() >= 1 && data.doctorRegNo.size() <= 50 &&
+             (!('tagline' in data) || (data.tagline is string && data.tagline.size() <= 200)) &&
+             data.phone is string && data.phone.size() >= 7 && data.phone.size() <= 25 &&
+             isValidEmail(data.email) &&
+             (!('address' in data) || (data.address is string && data.address.size() <= 500)) &&
+             data.consultationFee is number && data.consultationFee >= 0 &&
+             (!('followUpValidityDays' in data) || (data.followUpValidityDays is number && data.followUpValidityDays >= 0 && data.followUpValidityDays <= 365)) &&
+             (!('workingHours' in data) || (data.workingHours is map && data.workingHours.size() <= 10)) &&
+             (!('slotDurationMinutes' in data) || (data.slotDurationMinutes is number && data.slotDurationMinutes >= 5 && data.slotDurationMinutes <= 120)) &&
+             (!('createdAt' in data) || isValidDate(data.createdAt)) &&
+             (!('updatedAt' in data) || isValidDate(data.updatedAt));
+    }
+
+    // 11. Audit Log validator
+    function isValidAuditLog(data) {
+      let allowedFields = ['id', 'clinicId', 'actorId', 'actorName', 'actorRole', 'action', 'resourceType', 'resourceId', 'details', 'ipAddress', 'timestamp', 'createdAt'];
+      let requiredFields = ['clinicId', 'actorId', 'actorName', 'actorRole', 'action', 'resourceType', 'resourceId', 'timestamp'];
+
+      return hasRequiredFields(data, requiredFields) &&
+             hasOnlyAllowedFields(data, allowedFields) &&
+             (!('id' in data) || (data.id is string && data.id.size() >= 1 && data.id.size() <= 128)) &&
+             data.clinicId is string && data.clinicId.size() >= 1 && data.clinicId.size() <= 128 &&
+             data.actorId is string && data.actorId.size() >= 1 && data.actorId.size() <= 128 &&
+             data.actorName is string && data.actorName.size() >= 1 && data.actorName.size() <= 100 &&
+             data.actorRole in ['doctor', 'receptionist', 'system', 'admin'] &&
+             data.action is string && data.action.size() >= 1 && data.action.size() <= 100 &&
+             data.resourceType is string && data.resourceType.size() >= 1 && data.resourceType.size() <= 100 &&
+             data.resourceId is string && data.resourceId.size() >= 1 && data.resourceId.size() <= 128 &&
+             (!('details' in data) || (data.details is map && data.details.size() <= 50)) &&
+             (!('ipAddress' in data) || (data.ipAddress is string && data.ipAddress.size() <= 50)) &&
+             isValidDate(data.timestamp) &&
+             (!('createdAt' in data) || isValidDate(data.createdAt));
+    }
+
+
+    // ===============================================================
+    // Collection Rules
+    // ===============================================================
+
+    // 1. Users collection
+    // Staff profiles (doctors, receptionists). Users can read their own profile.
+    // Doctors manage staff in their clinic.
+    match /users/{userId} {
+      allow get: if isOwner(userId) || (isAuthenticated() && isDoctor(resource.data.clinicId));
+      allow list: if isAuthenticated() && isDoctor(resource.data.clinicId);
+
+      allow create: if isAuthenticated() &&
+                    isValidUser(request.resource.data) &&
+                    isMatchingId(userId) &&
+                    (isDoctor(request.resource.data.clinicId) ||
+                     ('role' in request.auth.token && request.auth.token.role == 'doctor' &&
+                      'clinicId' in request.auth.token && request.auth.token.clinicId == request.resource.data.clinicId));
+
+      allow update: if isAuthenticated() &&
+                    isValidUser(request.resource.data) &&
+                    ((isDoctor(resource.data.clinicId) &&
+                      request.resource.data.clinicId == resource.data.clinicId &&
+                      areImmutableFieldsUnchanged(['id', 'uid', 'clinicId', 'createdAt'])) ||
+                     (isOwner(userId) &&
+                      areImmutableFieldsUnchanged(['id', 'uid', 'clinicId', 'role', 'status', 'email', 'createdAt'])));
+
+      allow delete: if isAuthenticated() &&
+                    isDoctor(resource.data.clinicId) &&
+                    !isOwner(userId);
+    }
+
+    // 2. Patients collection
+    // Doctor has full read/write. Receptionist can read and create/update demographics.
+    // Receptionist cannot delete. Direct patient access denied.
+    match /patients/{patientId} {
+      allow read: if isStaff(resource.data.clinicId);
+
+      allow create: if isStaff(request.resource.data.clinicId) &&
+                    isValidPatient(request.resource.data) &&
+                    isMatchingId(patientId);
+
+      allow update: if isStaff(resource.data.clinicId) &&
+                    request.resource.data.clinicId == resource.data.clinicId &&
+                    isValidPatient(request.resource.data) &&
+                    areImmutableFieldsUnchanged(['id', 'clinicId', 'createdAt']);
+
+      allow delete: if isDoctor(resource.data.clinicId);
+    }
+
+    // 3. Appointments collection
+    // Doctor & Receptionist can read/write clinic appointments.
+    // Patients can create requests (status == 'requested') and get their specific appointment.
+    match /appointments/{appointmentId} {
+      allow get: if isStaff(resource.data.clinicId) ||
+                 (isAuthenticated() && resource.data.patientId == request.auth.uid);
+
+      allow list: if isStaff(resource.data.clinicId);
+
+      allow create: if (isStaff(request.resource.data.clinicId) &&
+                        isValidAppointment(request.resource.data) &&
+                        isMatchingId(appointmentId)) ||
+                       (isAuthenticated() &&
+                        isValidPatientAppointmentRequest(request.resource.data) &&
+                        isMatchingId(appointmentId));
+
+      allow update: if isStaff(resource.data.clinicId) &&
+                    request.resource.data.clinicId == resource.data.clinicId &&
+                    isValidAppointment(request.resource.data) &&
+                    areImmutableFieldsUnchanged(['id', 'clinicId', 'patientId', 'createdAt']);
+
+      allow delete: if isStaff(resource.data.clinicId);
+    }
+
+    // 4. Consultations collection
+    // Doctor has full read/write for their clinic. Receptionists and patients have NO access.
+    match /consultations/{consultationId} {
+      allow read: if isDoctor(resource.data.clinicId);
+
+      allow create: if isDoctor(request.resource.data.clinicId) &&
+                    isValidConsultation(request.resource.data) &&
+                    isMatchingId(consultationId);
+
+      allow update: if isDoctor(resource.data.clinicId) &&
+                    request.resource.data.clinicId == resource.data.clinicId &&
+                    isValidConsultation(request.resource.data) &&
+                    areImmutableFieldsUnchanged(['id', 'clinicId', 'patientId', 'createdAt']);
+
+      allow delete: if isDoctor(resource.data.clinicId);
+    }
+
+    // 5. Prescriptions collection
+    // Doctor has full read/write. Versioning protected. Receptionists cannot create or modify.
+    match /prescriptions/{prescriptionId} {
+      allow read: if isStaff(resource.data.clinicId);
+
+      allow create: if isDoctor(request.resource.data.clinicId) &&
+                    isValidPrescription(request.resource.data) &&
+                    isMatchingId(prescriptionId);
+
+      allow update: if isDoctor(resource.data.clinicId) &&
+                    request.resource.data.clinicId == resource.data.clinicId &&
+                    isValidPrescription(request.resource.data) &&
+                    areImmutableFieldsUnchanged(['id', 'clinicId', 'consultationId', 'patientId', 'createdAt']) &&
+                    request.resource.data.version >= resource.data.version;
+
+      allow delete: if isDoctor(resource.data.clinicId);
+    }
+
+    // 6. Medical Documents collection
+    // Doctor has full read/write. Receptionist can upload and view for patients, but cannot delete.
+    match /medicalDocuments/{documentId} {
+      allow read: if isStaff(resource.data.clinicId);
+
+      allow create: if isStaff(request.resource.data.clinicId) &&
+                    isValidMedicalDocument(request.resource.data) &&
+                    isMatchingId(documentId);
+
+      allow update: if isDoctor(resource.data.clinicId) &&
+                    request.resource.data.clinicId == resource.data.clinicId &&
+                    isValidMedicalDocument(request.resource.data) &&
+                    areImmutableFieldsUnchanged(['id', 'clinicId', 'patientId', 'fileUrl', 'createdAt']);
+
+      allow delete: if isDoctor(resource.data.clinicId);
+    }
+
+    // 7. Bills collection
+    // Doctor has full read/write. Receptionist can create and update payments.
+    // Receptionist cannot modify billing items or pricing breakdown. Receptionist cannot delete.
+    match /bills/{billId} {
+      allow read: if isStaff(resource.data.clinicId);
+
+      allow create: if isStaff(request.resource.data.clinicId) &&
+                    isValidBill(request.resource.data) &&
+                    isMatchingId(billId);
+
+      allow update: if (isDoctor(resource.data.clinicId) &&
+                        request.resource.data.clinicId == resource.data.clinicId &&
+                        isValidBill(request.resource.data) &&
+                        areImmutableFieldsUnchanged(['id', 'clinicId', 'patientId', 'createdAt'])) ||
+                       (isReceptionist(resource.data.clinicId) &&
+                        request.resource.data.clinicId == resource.data.clinicId &&
+                        isValidBill(request.resource.data) &&
+                        areImmutableFieldsUnchanged(['id', 'clinicId', 'patientId', 'billNumber', 'items', 'subtotal', 'discount', 'tax', 'totalAmount', 'createdAt']));
+
+      allow delete: if isDoctor(resource.data.clinicId);
+    }
+
+    // 8. Notifications collection
+    // Doctor/System access for notification queue. Receptionist and patient access denied.
+    match /notifications/{notificationId} {
+      allow read: if isDoctor(resource.data.clinicId);
+
+      allow create: if isDoctor(request.resource.data.clinicId) &&
+                    isValidNotification(request.resource.data) &&
+                    isMatchingId(notificationId);
+
+      allow update: if isDoctor(resource.data.clinicId) &&
+                    request.resource.data.clinicId == resource.data.clinicId &&
+                    isValidNotification(request.resource.data) &&
+                    areImmutableFieldsUnchanged(['id', 'clinicId', 'createdAt']);
+
+      allow delete: if isDoctor(resource.data.clinicId);
+    }
+
+    // 9. Follow-ups collection
+    // Doctor has full read/write. Receptionist read-only.
+    match /followUps/{followUpId} {
+      allow read: if isStaff(resource.data.clinicId);
+
+      allow create: if isDoctor(request.resource.data.clinicId) &&
+                    isValidFollowUp(request.resource.data) &&
+                    isMatchingId(followUpId);
+
+      allow update: if isDoctor(resource.data.clinicId) &&
+                    request.resource.data.clinicId == resource.data.clinicId &&
+                    isValidFollowUp(request.resource.data) &&
+                    areImmutableFieldsUnchanged(['id', 'clinicId', 'patientId', 'createdAt']);
+
+      allow delete: if isDoctor(resource.data.clinicId);
+    }
+
+    // 10. Clinic Settings collection
+    // Doctor can read/write clinic settings. Receptionist can read only.
+    match /clinicSettings/{settingId} {
+      allow read: if isStaff(resource.data.clinicId);
+
+      allow create: if isDoctor(request.resource.data.clinicId) &&
+                    isValidClinicSettings(request.resource.data) &&
+                    isMatchingId(settingId);
+
+      allow update: if isDoctor(resource.data.clinicId) &&
+                    request.resource.data.clinicId == resource.data.clinicId &&
+                    isValidClinicSettings(request.resource.data) &&
+                    areImmutableFieldsUnchanged(['id', 'clinicId', 'createdAt']);
+
+      allow delete: if isDoctor(resource.data.clinicId);
+    }
+
+    // 11. Audit Logs collection
+    // Append-only audit trail. Doctor read-only. Modifications and deletions strictly forbidden.
+    match /auditLogs/{logId} {
+      allow read: if isDoctor(resource.data.clinicId);
+
+      allow create: if isStaff(request.resource.data.clinicId) &&
+                    isValidAuditLog(request.resource.data) &&
+                    isMatchingId(logId);
+
+      allow update: if false;
+
+      allow delete: if false;
+    }
+
+    // Default deny for all other paths
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}

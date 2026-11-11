@@ -1,0 +1,54 @@
+rules_version = '2';
+service firebase.storage {
+  match /b/{bucket}/o {
+    
+    // Helper functions
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+    
+    function getUserData() {
+      return firestore.get(/databases/(default)/documents/users/$(request.auth.uid)).data;
+    }
+    
+    function isDoctor(clinicId) {
+      return isAuthenticated() && 
+             request.auth.token.clinicId == clinicId && 
+             (request.auth.token.role == 'doctor' || getUserData().role == 'doctor');
+    }
+    
+    function isReceptionist(clinicId) {
+      return isAuthenticated() && 
+             request.auth.token.clinicId == clinicId && 
+             (request.auth.token.role == 'receptionist' || getUserData().role == 'receptionist');
+    }
+    
+    function isStaff(clinicId) {
+      return isDoctor(clinicId) || isReceptionist(clinicId);
+    }
+    
+    function isValidMedicalDoc() {
+      return request.resource.size < 15 * 1024 * 1024 // 15MB max
+          && (request.resource.contentType.matches('image/.*') || request.resource.contentType == 'application/pdf');
+    }
+
+    // Clinic-scoped storage paths: clinics/{clinicId}/patients/{patientId}/{documentId}
+    match /clinics/{clinicId}/patients/{patientId}/{allPaths=**} {
+      // Read access: Doctor and Receptionist of the clinic
+      allow read: if isStaff(clinicId);
+      
+      // Upload/Create: Doctor or Receptionist with valid file type and size
+      allow create: if isStaff(clinicId) && isValidMedicalDoc();
+      
+      // Update/Delete: Only Doctor can delete or replace medical files
+      allow update, delete: if isDoctor(clinicId);
+    }
+    
+    // Clinic branding assets (logos, letterhead stamps)
+    match /clinics/{clinicId}/branding/{fileName} {
+      allow read: if isAuthenticated() && request.auth.token.clinicId == clinicId;
+      allow write: if isDoctor(clinicId) && request.resource.size < 2 * 1024 * 1024 && request.resource.contentType.matches('image/.*');
+    }
+  }
+}
+

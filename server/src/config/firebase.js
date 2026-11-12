@@ -26,6 +26,15 @@ const resolveFirestoreInstance = (appInstance) => {
 };
 
 export const initFirebase = () => {
+  if (process.env.CLINICCARE_USE_LOCAL_DB === 'true') {
+    isFirebaseInitialized = false;
+    firestoreDb = null;
+    firebaseAuth = null;
+    firebaseStorage = null;
+    console.log('ℹ️ CLINICCARE_USE_LOCAL_DB=true set. Operating in isolated local data mode.');
+    return { isFirebaseInitialized, firestoreDb, firebaseAuth, firebaseStorage };
+  }
+
   if (admin.apps.length > 0) {
     isFirebaseInitialized = true;
     firestoreDb = resolveFirestoreInstance(admin.apps[0]);

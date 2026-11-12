@@ -1,12 +1,12 @@
 import { dbService } from '../services/db.js';
 import { logAudit } from '../utils/auditLogger.js';
 
+import { getNextSequenceCode } from '../utils/helpers.js';
+
 const generateRxNumber = async (clinicId) => {
   const currentYear = new Date().getFullYear();
   const prescriptions = await dbService.getCollection('prescriptions', clinicId);
-  const count = prescriptions.length + 1;
-  const padded = String(count).padStart(5, '0');
-  return `RX-${currentYear}-${padded}`;
+  return getNextSequenceCode(prescriptions, 'rxNumber', `RX-${currentYear}-`, 5);
 };
 
 export const prescriptionController = {

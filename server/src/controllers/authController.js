@@ -3,6 +3,7 @@ import { dbService } from '../services/db.js';
 import { logAudit } from '../utils/auditLogger.js';
 import { getFirebaseState } from '../config/firebase.js';
 import { signSessionToken } from '../utils/sessionToken.js';
+import { sanitizeUser } from '../utils/helpers.js';
 
 export const authController = {
   // Login handler
@@ -28,11 +29,9 @@ export const authController = {
               users.find(u => u.uid === uid);
 
             if (!user) {
-              const inferredRole = normalizedEmail?.startsWith('doctor')
+              const inferredRole = users.length === 0
                 ? 'doctor'
-                : users.length === 0
-                  ? 'doctor'
-                  : (decoded.role || role || 'receptionist');
+                : (decoded.role || 'receptionist');
               user = await dbService.createDocument('users', {
                 uid,
                 name: decoded.name || userEmail?.split('@')[0] || 'Clinic Staff',
@@ -91,15 +90,6 @@ export const authController = {
       let user =
         users.find(u => u.email?.toLowerCase() === normalizedEmail && u.passwordHash) ||
         users.find(u => u.email?.toLowerCase() === normalizedEmail);
-
-      if (!user) {
-        // In local mode, if doctor logs in for the first time
-        if (normalizedEmail.includes('doctor')) {
-          user = users.find(u => u.role === 'doctor');
-        } else if (normalizedEmail.includes('recept')) {
-          user = users.find(u => u.role === 'receptionist');
-        }
-      }
 
       if (!user) {
         return res.status(401).json({ error: 'User not found or invalid credentials' });
@@ -173,7 +163,7 @@ export const authController = {
       const user = await dbService.getDocument('users', req.user.id || req.user.uid);
       const clinic = await dbService.getDocument('clinicSettings', req.user.clinicId || 'clinic-default');
       return res.json({
-        user: user || req.user,
+        user: sanitizeUser(user) || sanitizeUser(req.user),
         clinic: clinic || null
       });
     } catch (err) {
@@ -216,7 +206,7 @@ export const authController = {
             try {
               const existingFbUser = await firebaseAuth.getUserByEmail(email.toLowerCase());
               firebaseUid = existingFbUser.uid;
-            } catch {}
+            } catch { }
           }
         }
       }
@@ -246,7 +236,7 @@ export const authController = {
         details: { name, email, role: newStaff.role, firebaseSynced: Boolean(firebaseUid) }
       });
 
-      return res.status(201).json(newStaff);
+      return res.status(201).json(sanitizeUser(newStaff));
     } catch (err) {
       console.error('Failed to register staff account:', err);
       return res.status(500).json({ error: 'Failed to register staff account' });
@@ -311,7 +301,7 @@ export const authController = {
         details: { status }
       });
 
-      return res.json(updated);
+      return res.json(sanitizeUser(updated));
     } catch (err) {
       return res.status(500).json({ error: 'Failed to update staff status' });
     }

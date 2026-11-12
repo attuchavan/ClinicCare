@@ -40,11 +40,9 @@ export const verifyAuth = async (req, res, next) => {
           await dbService.getDocument('users', decodedToken.uid);
 
         if (!user) {
-          const role = normalizedEmail?.startsWith('doctor')
+          const role = users.length === 0
             ? 'doctor'
-            : users.length === 0
-              ? 'doctor'
-              : (decodedToken.role || 'receptionist');
+            : (decodedToken.role || 'receptionist');
           user = await dbService.createDocument('users', {
             uid: decodedToken.uid,
             email: normalizedEmail || '',
@@ -76,50 +74,56 @@ export const verifyAuth = async (req, res, next) => {
       }
     }
 
-    // Local / Dev Token handling
-    if (token === 'dev-doctor-token' || token.startsWith('mock-doctor-')) {
-      const doctorUser = await dbService.getDocument('users', 'usr-doctor-01');
-      req.user = {
-        uid: doctorUser ? (doctorUser.uid || doctorUser.id) : 'usr-doctor-01',
-        id: doctorUser ? doctorUser.id : 'usr-doctor-01',
-        email: doctorUser ? doctorUser.email : 'doctor@cliniccare.com',
-        name: doctorUser ? doctorUser.name : 'Dr. Rajesh Sharma',
-        role: 'doctor',
-        clinicId: 'clinic-default'
-      };
-      return next();
-    }
+    // Local / Dev Token handling (strictly disabled in production / Vercel unless explicitly allowed)
+    const allowDevTokens =
+      process.env.ALLOW_DEV_TOKENS === 'true' ||
+      (process.env.NODE_ENV !== 'production' && !process.env.VERCEL);
 
-    if (token === 'dev-receptionist-token' || token.startsWith('mock-receptionist-')) {
-      const recUser = await dbService.getDocument('users', 'usr-receptionist-01');
-      req.user = {
-        uid: recUser ? (recUser.uid || recUser.id) : 'usr-receptionist-01',
-        id: recUser ? recUser.id : 'usr-receptionist-01',
-        email: recUser ? recUser.email : 'reception@cliniccare.com',
-        name: recUser ? recUser.name : 'Pooja Verma',
-        role: 'receptionist',
-        clinicId: 'clinic-default'
-      };
-      return next();
-    }
-
-    // Attempt base64 JSON token parsing if custom
-    try {
-      const decodedStr = Buffer.from(token, 'base64').toString('utf8');
-      const parsed = JSON.parse(decodedStr);
-      if (parsed.uid && parsed.role) {
+    if (allowDevTokens) {
+      if (token === 'dev-doctor-token' || token.startsWith('mock-doctor-')) {
+        const doctorUser = await dbService.getDocument('users', 'usr-doctor-01');
         req.user = {
-          uid: parsed.uid,
-          id: parsed.id || parsed.uid,
-          email: parsed.email || '',
-          name: parsed.name || 'User',
-          role: parsed.role,
-          clinicId: parsed.clinicId || 'clinic-default'
+          uid: doctorUser ? (doctorUser.uid || doctorUser.id) : 'usr-doctor-01',
+          id: doctorUser ? doctorUser.id : 'usr-doctor-01',
+          email: doctorUser ? doctorUser.email : 'doctor@cliniccare.com',
+          name: doctorUser ? doctorUser.name : 'Dr. Rajesh Sharma',
+          role: 'doctor',
+          clinicId: 'clinic-default'
         };
         return next();
       }
-    } catch {
-      // not a base64 json token
+
+      if (token === 'dev-receptionist-token' || token.startsWith('mock-receptionist-')) {
+        const recUser = await dbService.getDocument('users', 'usr-receptionist-01');
+        req.user = {
+          uid: recUser ? (recUser.uid || recUser.id) : 'usr-receptionist-01',
+          id: recUser ? recUser.id : 'usr-receptionist-01',
+          email: recUser ? recUser.email : 'reception@cliniccare.com',
+          name: recUser ? recUser.name : 'Pooja Verma',
+          role: 'receptionist',
+          clinicId: 'clinic-default'
+        };
+        return next();
+      }
+
+      // Attempt base64 JSON token parsing in local dev/test mode only
+      try {
+        const decodedStr = Buffer.from(token, 'base64').toString('utf8');
+        const parsed = JSON.parse(decodedStr);
+        if (parsed.uid && parsed.role) {
+          req.user = {
+            uid: parsed.uid,
+            id: parsed.id || parsed.uid,
+            email: parsed.email || '',
+            name: parsed.name || 'User',
+            role: parsed.role,
+            clinicId: parsed.clinicId || 'clinic-default'
+          };
+          return next();
+        }
+      } catch {
+        // not a base64 json token
+      }
     }
 
     return res.status(401).json({ error: 'Unauthorized: Authentication token is invalid' });

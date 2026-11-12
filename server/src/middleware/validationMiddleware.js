@@ -1,4 +1,5 @@
 import { body, param, validationResult } from 'express-validator';
+import { getClinicDateString } from '../utils/helpers.js';
 
 const INDIAN_MOBILE_REGEX = /^[6-9]\d{9}$/;
 const NAME_REGEX = /^[\p{L}\s.'-]+$/u;
@@ -206,7 +207,7 @@ export const appointmentValidationRules = {
       .notEmpty().withMessage('Consultation date is required')
       .isISO8601().withMessage('Date must be formatted as YYYY-MM-DD')
       .custom((value) => {
-        const todayStr = new Date().toISOString().slice(0, 10);
+        const todayStr = getClinicDateString();
         if (value < todayStr) {
           throw new Error('Appointment date cannot be in the past');
         }

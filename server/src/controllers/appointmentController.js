@@ -1,11 +1,11 @@
 import { dbService } from '../services/db.js';
 import { logAudit } from '../utils/auditLogger.js';
 
+import { getWeekdayKeyFromDateStr } from '../utils/helpers.js';
+
 // Helper to compute available slots for a given date
 const calculateAvailableSlots = (dateStr, workingHours, slotDurationMinutes, existingAppointments) => {
-  const dateObj = new Date(dateStr);
-  const days = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'];
-  const dayName = days[dateObj.getDay()];
+  const dayName = getWeekdayKeyFromDateStr(dateStr);
   const schedule = workingHours[dayName];
 
   if (!schedule || schedule.closed || !schedule.open || !schedule.close) {

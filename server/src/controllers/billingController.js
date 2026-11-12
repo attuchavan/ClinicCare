@@ -1,12 +1,12 @@
 import { dbService } from '../services/db.js';
 import { logAudit } from '../utils/auditLogger.js';
 
+import { getClinicDateString, getNextSequenceCode } from '../utils/helpers.js';
+
 const generateReceiptNumber = async (clinicId) => {
-  const dateStr = new Date().toISOString().slice(0, 10).replace(/-/g, '');
+  const dateStr = getClinicDateString().replace(/-/g, '');
   const bills = await dbService.getCollection('bills', clinicId);
-  const count = bills.length + 1;
-  const padded = String(count).padStart(4, '0');
-  return `REC-${dateStr}-${padded}`;
+  return getNextSequenceCode(bills, 'receiptNumber', `REC-${dateStr}-`, 4);
 };
 
 export const billingController = {
@@ -78,7 +78,7 @@ export const billingController = {
       const pendingAmount = Math.max(0, totalAmount - numPaid);
 
       let paymentStatus = 'pending';
-      if (numPaid >= totalAmount && totalAmount > 0) {
+      if (numPaid >= totalAmount) {
         paymentStatus = 'paid';
       } else if (numPaid > 0) {
         paymentStatus = 'partially_paid';
@@ -110,7 +110,7 @@ export const billingController = {
         }] : [],
         clinicDetails: {
           name: clinic?.name || 'ClinicCare Family Clinic',
-          doctorName: clinic?.doctorName || 'Dr. Rajesh Sharma',
+          doctorName: clinic?.doctorName || 'Clinic Physician',
           phone: clinic?.phone || '',
           address: clinic?.address || ''
         },
@@ -200,7 +200,7 @@ export const billingController = {
       const clinicId = req.user.clinicId;
       const bills = await dbService.getCollection('bills', clinicId);
 
-      const todayStr = new Date().toISOString().slice(0, 10);
+      const todayStr = getClinicDateString();
       const currentMonthPrefix = month || todayStr.slice(0, 7); // e.g. 2026-11
 
       let todayTotal = 0;
@@ -219,9 +219,9 @@ export const billingController = {
         // Ever pending
         totalPendingEver += (b.pendingAmount || 0);
 
-        // All payments on today
+        // All payments on today (evaluated in clinic timezone)
         (b.payments || []).forEach(p => {
-          if (p.date && p.date.slice(0, 10) === todayStr) {
+          if (p.date && getClinicDateString(new Date(p.date)) === todayStr) {
             todayTotal += p.amount;
             if (p.method === 'cash') todayCash += p.amount;
             if (p.method === 'upi') todayUpi += p.amount;
@@ -229,7 +229,8 @@ export const billingController = {
         });
 
         // Month collections
-        if (b.createdAt && b.createdAt.startsWith(currentMonthPrefix)) {
+        const billMonth = b.createdAt ? getClinicDateString(new Date(b.createdAt)).slice(0, 7) : '';
+        if (billMonth === currentMonthPrefix) {
           monthTotal += (b.totalAmount || 0);
           monthPaid += (b.paidAmount || 0);
           monthPending += (b.pendingAmount || 0);

@@ -1,4 +1,5 @@
 import { dbService } from '../services/db.js';
+import { getClinicDateString } from '../utils/helpers.js';
 import { logAudit } from '../utils/auditLogger.js';
 
 export const followUpController = {
@@ -9,7 +10,7 @@ export const followUpController = {
       const clinicId = req.user.clinicId;
       const followUps = await dbService.getCollection('followUps', clinicId);
 
-      const todayStr = new Date().toISOString().slice(0, 10);
+      const todayStr = getClinicDateString();
 
       let filtered = followUps.filter(f => {
         if (patientId && f.patientId !== patientId) return false;

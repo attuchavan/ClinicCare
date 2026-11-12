@@ -18,14 +18,30 @@ import clinicRoutes from './routes/clinicRoutes.js';
 
 const app = express();
 
+// Trust Vercel / reverse-proxy X-Forwarded-For headers so express-rate-limit works accurately
+app.set('trust proxy', 1);
+
 // Security middleware
 app.use(helmet({
   crossOriginResourcePolicy: { policy: "cross-origin" }
 }));
 
-// CORS configuration
+// CORS configuration (includes localhost dev, configured CLIENT_URL, and Vercel preview/prod domains)
+const envClientUrls = (process.env.CLIENT_URL || '')
+  .split(',')
+  .map((u) => u.trim())
+  .filter(Boolean);
+
+const vercelOrigins = [
+  process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : null,
+  process.env.VERCEL_BRANCH_URL ? `https://${process.env.VERCEL_BRANCH_URL}` : null,
+  process.env.VERCEL_PROJECT_PRODUCTION_URL ? `https://${process.env.VERCEL_PROJECT_PRODUCTION_URL}` : null
+].filter(Boolean);
+
 const allowedOrigins = [
-  process.env.CLIENT_URL || 'http://localhost:5173',
+  ...envClientUrls,
+  ...vercelOrigins,
+  'http://localhost:5173',
   'http://localhost:3000',
   'http://127.0.0.1:5173'
 ];

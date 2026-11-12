@@ -1,18 +1,16 @@
 import fs from 'fs';
 import path from 'path';
-import { fileURLToPath } from 'url';
 import { v4 as uuidv4 } from 'uuid';
 import { getFirebaseState } from '../config/firebase.js';
+import { getDataDir, ensureWritableDir } from '../utils/storagePaths.js';
 
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
-const DATA_DIR = path.resolve(__dirname, '../../data');
-const DB_FILE = path.resolve(DATA_DIR, 'cliniccare_db.json');
+let memoryDbCache = null;
 
-// Ensure data directory exists
-if (!fs.existsSync(DATA_DIR)) {
-  fs.mkdirSync(DATA_DIR, { recursive: true });
-}
+const getDbFilePath = () => {
+  const dataDir = getDataDir();
+  ensureWritableDir(dataDir);
+  return path.resolve(dataDir, 'cliniccare_db.json');
+};
 
 // Initial seed data for fresh setup
 const getInitialSeed = () => ({
@@ -80,28 +78,46 @@ const getInitialSeed = () => ({
   auditLogs: []
 });
 
-// Load local database
+// Load local database safely (with memory fallback if filesystem is unavailable)
 const loadLocalDb = () => {
-  if (!fs.existsSync(DB_FILE)) {
-    const seed = getInitialSeed();
-    fs.writeFileSync(DB_FILE, JSON.stringify(seed, null, 2), 'utf8');
-    return seed;
+  const dbFile = getDbFilePath();
+  if (!fs.existsSync(dbFile)) {
+    if (!memoryDbCache) {
+      memoryDbCache = getInitialSeed();
+    }
+    try {
+      fs.writeFileSync(dbFile, JSON.stringify(memoryDbCache, null, 2), 'utf8');
+    } catch (writeErr) {
+      console.warn('Local DB seed write fallback:', writeErr.message);
+    }
+    return memoryDbCache;
   }
   try {
-    const content = fs.readFileSync(DB_FILE, 'utf8');
-    return JSON.parse(content);
+    const content = fs.readFileSync(dbFile, 'utf8');
+    memoryDbCache = JSON.parse(content);
+    return memoryDbCache;
   } catch (err) {
     console.error('Error reading local db file, resetting to initial seed:', err);
-    const seed = getInitialSeed();
-    fs.writeFileSync(DB_FILE, JSON.stringify(seed, null, 2), 'utf8');
-    return seed;
+    memoryDbCache = getInitialSeed();
+    try {
+      fs.writeFileSync(dbFile, JSON.stringify(memoryDbCache, null, 2), 'utf8');
+    } catch {}
+    return memoryDbCache;
   }
 };
 
-// Save local database
+// Save local database safely
 const saveLocalDb = (data) => {
-  fs.writeFileSync(DB_FILE, JSON.stringify(data, null, 2), 'utf8');
+  memoryDbCache = data;
+  try {
+    const dbFile = getDbFilePath();
+    fs.writeFileSync(dbFile, JSON.stringify(data, null, 2), 'utf8');
+  } catch (err) {
+    console.warn('Local DB disk write skipped (using memory cache):', err.message);
+  }
 };
+
+const SEED_FALLBACK_COLLECTIONS = new Set(['users', 'clinicSettings']);
 
 export const dbService = {
   // Get all documents in a collection
@@ -114,8 +130,10 @@ export const dbService = {
           query = query.where('clinicId', '==', clinicId);
         }
         const snapshot = await query.get();
-        if (snapshot && !snapshot.empty) {
-          return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+        if (snapshot) {
+          if (!snapshot.empty || !SEED_FALLBACK_COLLECTIONS.has(collectionName)) {
+            return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+          }
         }
       } catch (err) {
         console.warn(`Firestore read fallback for collection "${collectionName}":`, err.message);
@@ -218,12 +236,15 @@ export const dbService = {
     return updatedItem;
   },
 
-  // Delete a document
+  // Delete a document (keeps local fallback synchronized with Firestore)
   async deleteDocument(collectionName, id) {
     const { isFirebaseInitialized, firestoreDb } = getFirebaseState();
     if (isFirebaseInitialized && firestoreDb) {
-      await firestoreDb.collection(collectionName).doc(id).delete();
-      return { id, deleted: true };
+      try {
+        await firestoreDb.collection(collectionName).doc(id).delete();
+      } catch (err) {
+        console.warn(`Firestore delete warning for ${collectionName}/${id}:`, err.message);
+      }
     }
 
     const localDb = loadLocalDb();

@@ -1,13 +1,13 @@
 import { dbService } from '../services/db.js';
 import { logAudit } from '../utils/auditLogger.js';
 
+import { getNextSequenceCode } from '../utils/helpers.js';
+
 // Helper to generate next sequential Patient ID: CC-YYYY-XXXX
 const generatePatientId = async (clinicId) => {
   const currentYear = new Date().getFullYear();
   const patients = await dbService.getCollection('patients', clinicId);
-  const count = patients.length + 1;
-  const padded = String(count).padStart(4, '0');
-  return `CC-${currentYear}-${padded}`;
+  return getNextSequenceCode(patients, 'patientId', `CC-${currentYear}-`, 4);
 };
 
 export const patientController = {

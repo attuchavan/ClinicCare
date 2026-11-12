@@ -1,16 +1,10 @@
 import fs from 'fs';
 import path from 'path';
-import { fileURLToPath } from 'url';
 import { dbService } from '../services/db.js';
 import { logAudit } from '../utils/auditLogger.js';
+import { getUploadsDir, ensureWritableDir } from '../utils/storagePaths.js';
 
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
-const UPLOADS_DIR = path.resolve(__dirname, '../../uploads/documents');
-
-if (!fs.existsSync(UPLOADS_DIR)) {
-  fs.mkdirSync(UPLOADS_DIR, { recursive: true });
-}
+const MAX_INLINE_BYTES = 600 * 1024; // Fits safely inside Firestore 1 MiB document limit
 
 export const documentController = {
   // List documents for a patient
@@ -46,13 +40,13 @@ export const documentController = {
         dbService.getCollection('prescriptions', clinicId)
       ]);
 
-      const previousDocs = docs.filter(d => 
-        d.patientId === patientId && 
+      const previousDocs = docs.filter(d =>
+        d.patientId === patientId &&
         !d.isArchived &&
         (d.category === 'Previous Prescription' || d.category === 'Handwritten Prescription' || d.isManualEntry)
       ).sort((a, b) => new Date(b.originalDocumentDate || b.createdAt) - new Date(a.originalDocumentDate || a.createdAt));
 
-      const clinicRx = rxList.filter(r => 
+      const clinicRx = rxList.filter(r =>
         r.patientId === patientId
       ).sort((a, b) => new Date(b.prescriptionDate || b.createdAt) - new Date(a.prescriptionDate || a.createdAt));
 
@@ -98,7 +92,9 @@ export const documentController = {
       let mimeType = 'text/plain';
       let fileSize = 0;
       let fileUrl = null;
+      let inlineDataUrl = null;
       let isManual = Boolean(isManualEntry);
+      const uploadsDir = getUploadsDir();
 
       // Scenario A: Standard file upload via multer
       if (req.file) {
@@ -107,7 +103,11 @@ export const documentController = {
         mimeType = req.file.mimetype;
         fileSize = req.file.size;
         fileUrl = `/api/documents/file/${req.file.filename}`;
-      } 
+        if (fileSize <= MAX_INLINE_BYTES && req.file.path && fs.existsSync(req.file.path)) {
+          const buf = fs.readFileSync(req.file.path);
+          inlineDataUrl = `data:${mimeType};base64,${buf.toString('base64')}`;
+        }
+      }
       // Scenario B: Mobile Camera Capture via Base64 payload
       else if (imageBase64 || imageData) {
         const rawData = imageBase64 || imageData;
@@ -129,9 +129,17 @@ export const documentController = {
         fileSize = buffer.length;
         fileUrl = `/api/documents/file/${fileName}`;
 
-        const filePath = path.join(UPLOADS_DIR, fileName);
-        fs.writeFileSync(filePath, buffer);
-      } 
+        if (ensureWritableDir(uploadsDir)) {
+          try {
+            fs.writeFileSync(path.join(uploadsDir, fileName), buffer);
+          } catch (writeErr) {
+            console.warn('Could not persist upload to disk:', writeErr.message);
+          }
+        }
+        if (buffer.length <= MAX_INLINE_BYTES) {
+          inlineDataUrl = `data:${mimeType};base64,${buffer.toString('base64')}`;
+        }
+      }
       // Scenario C: Manual Text Entry (No photo/document attached)
       else if (isManual || prescribedMedicines || doctorName) {
         isManual = true;
@@ -155,6 +163,7 @@ export const documentController = {
         mimeType,
         fileSize,
         fileUrl,
+        ...(inlineDataUrl ? { inlineDataUrl } : {}),
         isManualEntry: isManual,
         isArchived: false,
         uploadedBy: req.user.id,
@@ -245,19 +254,28 @@ export const documentController = {
     }
   },
 
-  // Stream/Serve document file securely
+  // Stream/Serve document file securely (falls back to inlineDataUrl on ephemeral serverless containers)
   async getFile(req, res) {
     try {
       const { filename } = req.params;
-      // Basic sanitization
       const safeFilename = path.basename(filename);
-      const filePath = path.join(UPLOADS_DIR, safeFilename);
+      const filePath = path.join(getUploadsDir(), safeFilename);
 
-      if (!fs.existsSync(filePath)) {
-        return res.status(404).json({ error: 'Document file not found' });
+      if (fs.existsSync(filePath)) {
+        return res.sendFile(filePath);
       }
 
-      return res.sendFile(filePath);
+      const docs = await dbService.getCollection('medicalDocuments', null);
+      const matched = docs.find((d) => d.fileName === safeFilename && d.inlineDataUrl);
+      if (matched?.inlineDataUrl) {
+        const match = matched.inlineDataUrl.match(/^data:([^;]+);base64,(.+)$/);
+        if (match) {
+          res.type(match[1]);
+          return res.send(Buffer.from(match[2], 'base64'));
+        }
+      }
+
+      return res.status(404).json({ error: 'Document file not found' });
     } catch (err) {
       return res.status(500).json({ error: 'Failed to access document file' });
     }

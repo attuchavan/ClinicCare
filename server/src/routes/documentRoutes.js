@@ -1,19 +1,17 @@
 import express from 'express';
 import multer from 'multer';
 import path from 'path';
-import { fileURLToPath } from 'url';
 import { documentController } from '../controllers/documentController.js';
 import { verifyAuth, requireRole, requireClinic } from '../middleware/authMiddleware.js';
 import { validate, documentValidationRules } from '../middleware/validationMiddleware.js';
+import { getUploadsDir, ensureWritableDir } from '../utils/storagePaths.js';
 
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
-const UPLOADS_DIR = path.resolve(__dirname, '../../uploads/documents');
-
-// Multer storage configuration
+// Multer storage configuration (uses /tmp on serverless runtimes like Vercel)
 const storage = multer.diskStorage({
   destination: (req, file, cb) => {
-    cb(null, UPLOADS_DIR);
+    const dir = getUploadsDir();
+    ensureWritableDir(dir);
+    cb(null, dir);
   },
   filename: (req, file, cb) => {
     const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1e9);

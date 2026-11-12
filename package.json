@@ -9,7 +9,7 @@
     "dev:client": "cd client && npm run dev",
     "dev:server": "cd server && npm run dev",
     "build:client": "cd client && npm run build",
-    "build": "cd client && npm run build",
+    "build": "node -e \"const fs=require('fs'),cp=require('child_process'); if(!fs.existsSync('client/node_modules/.bin/vite')) cp.execSync('npm install --prefix client',{stdio:'inherit'}); if(!fs.existsSync('server/node_modules/express')) cp.execSync('npm install --prefix server',{stdio:'inherit'}); cp.execSync('npm --prefix client run build',{stdio:'inherit'});\"",
     "start": "cd server && npm start"
   },
   "devDependencies": {

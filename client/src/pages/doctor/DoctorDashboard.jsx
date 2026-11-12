@@ -20,7 +20,7 @@ import { api } from '../../services/api.js';
 import { StatCard } from '../../components/common/StatCard.jsx';
 import { LoadingSpinner } from '../../components/common/LoadingSpinner.jsx';
 import { EmptyState } from '../../components/common/EmptyState.jsx';
-import { calculateAge, formatDate, getStatusBadgeStyle } from '../../utils/formatters.js';
+import { calculateAge, formatDate, getLocalDateString, getStatusBadgeStyle } from '../../utils/formatters.js';
 import { useToast } from '../../context/ToastContext.jsx';
 import { PreviousPrescriptionsModal } from '../../components/prescriptions/PreviousPrescriptionsModal.jsx';
 
@@ -37,7 +37,7 @@ export const DoctorDashboard = () => {
 
   const navigate = useNavigate();
   const { showToast } = useToast();
-  const todayStr = new Date().toISOString().slice(0, 10);
+  const todayStr = getLocalDateString();
 
   const loadPrevRxSummaries = async (queueItems) => {
     const uniqueIds = [...new Set(queueItems.map(a => a.patientId).filter(Boolean))];

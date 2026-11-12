@@ -92,8 +92,19 @@ export const CasePaper = () => {
   const [advice, setAdvice] = useState('');
   const [followUpDays, setFollowUpDays] = useState('5');
   const [consultationFeeRupees, setConsultationFeeRupees] = useState(
-    clinic?.consultationFee ? clinic.consultationFee / 100 : 500
+    clinic?.consultationFee != null ? clinic.consultationFee / 100 : 500
   );
+  const [syncedClinicFee, setSyncedClinicFee] = useState(clinic?.consultationFee ?? null);
+
+  useEffect(() => {
+    if (clinic?.consultationFee != null && clinic.consultationFee !== syncedClinicFee) {
+      const prevDefaultRupees = syncedClinicFee != null ? syncedClinicFee / 100 : 500;
+      if (Number(consultationFeeRupees) === prevDefaultRupees) {
+        setConsultationFeeRupees(clinic.consultationFee / 100);
+      }
+      setSyncedClinicFee(clinic.consultationFee);
+    }
+  }, [clinic?.consultationFee, syncedClinicFee, consultationFeeRupees]);
   const [paymentMethod, setPaymentMethod] = useState('Cash');
 
   // Load patient directory
@@ -272,10 +283,13 @@ export const CasePaper = () => {
         setSelectedPatient(newPatient);
       }
 
-      // Calculate follow-up date
-      const followUpDateObj = new Date(caseDate);
-      followUpDateObj.setDate(followUpDateObj.getDate() + Number(followUpDays || 5));
-      const followUpDateStr = followUpDateObj.toISOString().slice(0, 10);
+      // Calculate follow-up date (only if followUpDays > 0)
+      let followUpDateStr = '';
+      if (followUpDays !== '' && followUpDays !== null && Number(followUpDays) > 0) {
+        const followUpDateObj = new Date(caseDate);
+        followUpDateObj.setDate(followUpDateObj.getDate() + Number(followUpDays));
+        followUpDateStr = followUpDateObj.toISOString().slice(0, 10);
+      }
 
       // Step 2: Save Consultation
       const consultation = await api.consultations.create({
@@ -300,7 +314,11 @@ export const CasePaper = () => {
       });
 
       // Step 4: Record Billing / Receipt
-      const feeInPaise = Math.round(Number(consultationFeeRupees || 500) * 100);
+      const parsedFee =
+        consultationFeeRupees === '' || consultationFeeRupees === null || consultationFeeRupees === undefined
+          ? (clinic?.consultationFee != null ? clinic.consultationFee / 100 : 500)
+          : Number(consultationFeeRupees);
+      const feeInPaise = Math.max(0, Math.round(parsedFee * 100));
       let bill = null;
       try {
         bill = await api.billing.create({

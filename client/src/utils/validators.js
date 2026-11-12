@@ -248,7 +248,11 @@ export const validateNotPastDate = wrap((raw = '', { required = true, label = 'D
       ? { valid: false, status: 'empty', blurError: `${label} is required` }
       : { valid: true, status: 'idle' };
   }
-  const todayStr = new Date().toISOString().slice(0, 10);
+  const todayStr = new Intl.DateTimeFormat('en-CA', {
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit'
+  }).format(new Date());
   if (trimmed < todayStr) {
     return {
       valid: false,

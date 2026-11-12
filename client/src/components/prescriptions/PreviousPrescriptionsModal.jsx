@@ -454,7 +454,7 @@ export const PreviousPrescriptionsModal = ({
                           </h3>
                           <p className="text-xs text-slate-500 flex items-center gap-1.5 mt-0.5">
                             <Stethoscope className="w-3.5 h-3.5 text-teal-600" />
-                            Dr. {selectedRecord.data.doctorName || 'Rajesh Sharma'} • {formatDate(selectedRecord.data.prescriptionDate || selectedRecord.data.createdAt)}
+                            {selectedRecord.data.doctorDetails?.name || (selectedRecord.data.doctorName ? `Dr. ${selectedRecord.data.doctorName.replace(/^Dr\.\s*/i, '')}` : 'Attending Physician')} • {formatDate(selectedRecord.data.prescriptionDate || selectedRecord.data.createdAt)}
                           </p>
                         </div>
 

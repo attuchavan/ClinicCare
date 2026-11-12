@@ -30,7 +30,7 @@ export const Navbar = ({ onToggleSidebar }) => {
             {clinic?.name || 'City Care Family Clinic'}
           </h2>
           <p className="text-xs text-slate-500">
-            {clinic?.doctorName || 'Dr. Rajesh Sharma, M.D.'} • General Physician
+            {clinic?.doctorName || 'Clinic Physician'} • General Physician
           </p>
         </div>
       </div>

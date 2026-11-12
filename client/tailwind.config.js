@@ -38,6 +38,7 @@ export default {
           800: '#115e59',
           900: '#134e4a',
         }
+
       },
       fontFamily: {
         sans: ['Inter', 'system-ui', '-apple-system', 'BlinkMacSystemFont', 'Segoe UI', 'sans-serif'],

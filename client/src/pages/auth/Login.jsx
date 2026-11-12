@@ -276,28 +276,30 @@ export const Login = () => {
             </button>
           </form>
 
-          {/* Quick Demo Credentials Assistant */}
-          <div className="mt-6 pt-5 border-t border-slate-100">
-            <p className="text-xs font-semibold text-slate-500 text-center mb-3">
-              One-Click Credentials (Testing Mode)
-            </p>
-            <div className="grid grid-cols-2 gap-2">
-              <button
-                type="button"
-                onClick={() => handleQuickLogin('doctor')}
-                className="p-2 text-xs font-semibold bg-teal-50 text-teal-800 hover:bg-teal-100 rounded-lg border border-teal-200 transition-colors text-center"
-              >
-                Autofill Doctor
-              </button>
-              <button
-                type="button"
-                onClick={() => handleQuickLogin('receptionist')}
-                className="p-2 text-xs font-semibold bg-slate-100 text-slate-800 hover:bg-slate-200 rounded-lg border border-slate-200 transition-colors text-center"
-              >
-                Autofill Receptionist
-              </button>
+          {/* Quick Demo Credentials Assistant (dev / explicit demo mode only) */}
+          {(import.meta.env.DEV || import.meta.env.VITE_ENABLE_DEMO_LOGIN === 'true') && (
+            <div className="mt-6 pt-5 border-t border-slate-100">
+              <p className="text-xs font-semibold text-slate-500 text-center mb-3">
+                One-Click Credentials (Testing Mode)
+              </p>
+              <div className="grid grid-cols-2 gap-2">
+                <button
+                  type="button"
+                  onClick={() => handleQuickLogin('doctor')}
+                  className="p-2 text-xs font-semibold bg-teal-50 text-teal-800 hover:bg-teal-100 rounded-lg border border-teal-200 transition-colors text-center"
+                >
+                  Autofill Doctor
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handleQuickLogin('receptionist')}
+                  className="p-2 text-xs font-semibold bg-slate-100 text-slate-800 hover:bg-slate-200 rounded-lg border border-slate-200 transition-colors text-center"
+                >
+                  Autofill Receptionist
+                </button>
+              </div>
             </div>
-          </div>
+          )}
         </div>
 
         {/* Public Booking Link */}

@@ -89,7 +89,7 @@ export const ClinicSettings = () => {
         setSettings({
           ...data,
           workingHours,
-          consultationFeeRupees: data.consultationFee ? data.consultationFee / 100 : 500
+          consultationFeeRupees: data.consultationFee != null ? data.consultationFee / 100 : 500
         });
       })
       .catch(err => {
@@ -162,7 +162,7 @@ export const ClinicSettings = () => {
       setSettings({
         ...updated,
         workingHours: updated.workingHours || settings.workingHours,
-        consultationFeeRupees: updated.consultationFee ? updated.consultationFee / 100 : 500
+        consultationFeeRupees: updated.consultationFee != null ? updated.consultationFee / 100 : 500
       });
       updateClinicState(updated);
       interaction.resetInteraction();

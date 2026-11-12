@@ -24,7 +24,7 @@ import { StatCard } from '../../components/common/StatCard.jsx';
 import { Modal } from '../../components/common/Modal.jsx';
 import { LoadingSpinner } from '../../components/common/LoadingSpinner.jsx';
 import { EmptyState } from '../../components/common/EmptyState.jsx';
-import { calculateAge, formatDate, getStatusBadgeStyle } from '../../utils/formatters.js';
+import { calculateAge, formatDate, getLocalDateString, getStatusBadgeStyle } from '../../utils/formatters.js';
 import { useToast } from '../../context/ToastContext.jsx';
 import { useAuth } from '../../context/AuthContext.jsx';
 import { PreviousPrescriptionsModal } from '../../components/prescriptions/PreviousPrescriptionsModal.jsx';
@@ -101,7 +101,7 @@ export const ReceptionistDashboard = () => {
   });
   const [visitReason, setVisitReason] = useState('');
   const [visitType, setVisitType] = useState('walkin'); // 'walkin' | 'scheduled'
-  const [visitDate, setVisitDate] = useState(() => new Date().toISOString().slice(0, 10));
+  const [visitDate, setVisitDate] = useState(() => getLocalDateString());
   const [selectedSlot, setSelectedSlot] = useState('');
   const [availableSlots, setAvailableSlots] = useState([]);
   const [isClosedDay, setIsClosedDay] = useState(false);
@@ -126,7 +126,7 @@ export const ReceptionistDashboard = () => {
   const navigate = useNavigate();
   const { showToast } = useToast();
   const { clinic } = useAuth();
-  const todayStr = new Date().toISOString().slice(0, 10);
+  const todayStr = getLocalDateString();
 
   const [duplicateMatch, setDuplicateMatch] = useState(null);
   const bookingValidation = useFormInteraction();
@@ -229,6 +229,8 @@ export const ReceptionistDashboard = () => {
         setAvailableSlots(openSlots);
         if (openSlots.length > 0 && !openSlots.some(s => s.time === selectedSlot)) {
           setSelectedSlot(openSlots[0].time);
+        } else if (openSlots.length === 0) {
+          setSelectedSlot('');
         }
       })
       .catch(() => {

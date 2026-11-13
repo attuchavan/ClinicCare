@@ -27,10 +27,10 @@ export const Navbar = ({ onToggleSidebar }) => {
 
         <div className="hidden sm:block">
           <h2 className="text-base font-bold text-slate-900 leading-tight">
-            {clinic?.name || 'City Care Family Clinic'}
+            {clinic?.name || 'ClinicCare'}
           </h2>
           <p className="text-xs text-slate-500">
-            {clinic?.doctorName || 'Clinic Physician'} • General Physician
+            {clinic?.doctorName || (role === 'doctor' ? (user?.name || 'Doctor') : 'Clinic Physician')} • {clinic?.tagline || 'General Physician'}
           </p>
         </div>
       </div>
@@ -39,14 +39,16 @@ export const Navbar = ({ onToggleSidebar }) => {
       <div className="flex items-center gap-3">
         <div className="flex items-center gap-3 pl-3 border-l border-slate-200">
           <div className="text-right hidden sm:block">
-            <p className="text-sm font-bold text-slate-800 leading-tight">{user?.name || 'User'}</p>
+            <p className="text-sm font-bold text-slate-800 leading-tight">
+              {role === 'doctor' ? (clinic?.doctorName || user?.name || 'Doctor') : (user?.name || 'Staff')}
+            </p>
             <span className="inline-block px-2 py-0.5 text-[11px] font-semibold uppercase rounded-full bg-teal-50 text-teal-700 border border-teal-200">
               {role}
             </span>
           </div>
 
           <div className="w-9 h-9 rounded-full bg-teal-600 text-white flex items-center justify-center font-bold text-sm shadow-sm">
-            {user?.name ? user.name.charAt(0).toUpperCase() : 'U'}
+            {(role === 'doctor' ? (clinic?.doctorName || user?.name || 'D') : (user?.name || 'U')).charAt(0).toUpperCase()}
           </div>
 
           <button

@@ -61,11 +61,13 @@ export const Sidebar = ({ isOpen, onClose }) => {
         {/* Clinic info tag */}
         <div className="px-6 py-3.5 bg-slate-950/50 text-xs border-b border-slate-800/70">
           <span className="font-bold text-slate-200 block truncate">
-            {clinic?.name || 'City Care Family Clinic'}
+            {clinic?.name || 'ClinicCare'}
           </span>
           <div className="flex items-center gap-1.5 mt-1">
             <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
-            <span className="text-[11px] capitalize text-slate-400 font-medium">{role} Portal Active</span>
+            <span className="text-[11px] capitalize text-slate-400 font-medium truncate">
+              {role === 'doctor' ? (clinic?.doctorName || "Doctor's Desk") : `${role} Portal Active`}
+            </span>
           </div>
         </div>
 

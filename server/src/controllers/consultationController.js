@@ -53,7 +53,10 @@ export const consultationController = {
       }
 
       const clinicId = req.user.clinicId;
-      const patient = await dbService.getDocument('patients', patientId);
+      const [patient, clinic] = await Promise.all([
+        dbService.getDocument('patients', patientId),
+        dbService.getDocument('clinicSettings', clinicId)
+      ]);
       if (!patient || patient.clinicId !== clinicId) {
         return res.status(404).json({ error: 'Patient record not found' });
       }
@@ -79,7 +82,7 @@ export const consultationController = {
         doctorAdvice,
         followUpDate: followUpDate || '',
         doctorId: req.user.id,
-        doctorName: req.user.name
+        doctorName: clinic?.doctorName || req.user.name
       });
 
       // If tied to an appointment, transition appointment to 'completed'

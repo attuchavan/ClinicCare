@@ -364,7 +364,7 @@ export const PreviousPrescriptionsModal = ({
                           {rx.diagnosis || 'General Consultation'}
                         </h4>
                         <p className="text-xs text-slate-500 truncate mt-0.5">
-                          {(rx.medicines || []).length} medicines • Dr. {rx.doctorName || 'Rajesh Sharma'}
+                          {(rx.medicines || []).length} medicines • {rx.doctorDetails?.name || (rx.doctorName ? (rx.doctorName.startsWith('Dr.') ? rx.doctorName : `Dr. ${rx.doctorName}`) : (clinic?.doctorName || 'Attending Physician'))}
                         </p>
                       </button>
                     );

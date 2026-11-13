@@ -3,14 +3,18 @@
   "version": "1.0.0",
   "description": "ClinicCare - Digital Clinic Management System for General Physician",
   "private": true,
+  "workspaces": [
+    "client",
+    "server"
+  ],
   "scripts": {
-    "install:all": "npm install && cd client && npm install && cd ../server && npm install",
+    "install:all": "npm install",
     "dev": "concurrently \"npm run dev:server\" \"npm run dev:client\"",
-    "dev:client": "cd client && npm run dev",
-    "dev:server": "cd server && npm run dev",
-    "build:client": "cd client && npm run build",
-    "build": "node -e \"const fs=require('fs'),cp=require('child_process'); if(!fs.existsSync('client/node_modules/.bin/vite')) cp.execSync('npm install --prefix client',{stdio:'inherit'}); if(!fs.existsSync('server/node_modules/express')) cp.execSync('npm install --prefix server',{stdio:'inherit'}); cp.execSync('npm --prefix client run build',{stdio:'inherit'});\"",
-    "start": "cd server && npm start"
+    "dev:client": "npm --prefix client run dev",
+    "dev:server": "npm --prefix server run dev",
+    "build:client": "npm --prefix client run build",
+    "build": "npm --prefix client run build",
+    "start": "npm --prefix server start"
   },
   "devDependencies": {
     "concurrently": "^8.2.2"

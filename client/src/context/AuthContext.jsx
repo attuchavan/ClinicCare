@@ -87,6 +87,21 @@ export const AuthProvider = ({ children }) => {
     };
   }, [verifySession]);
 
+  // Silently refresh clinic and profile when window regains focus
+  useEffect(() => {
+    const handleFocus = () => {
+      const savedToken = localStorage.getItem('cliniccare_token');
+      if (savedToken) {
+        api.auth.getMe().then(data => {
+          if (data?.clinic) setClinic(data.clinic);
+          if (data?.user) setUser(data.user);
+        }).catch(() => {});
+      }
+    };
+    window.addEventListener('focus', handleFocus);
+    return () => window.removeEventListener('focus', handleFocus);
+  }, []);
+
   /**
    * Authenticate user with Firebase Auth or fallback
    */
@@ -169,6 +184,20 @@ export const AuthProvider = ({ children }) => {
 
   const updateClinicState = (updatedClinic) => {
     setClinic(updatedClinic);
+    if (updatedClinic) {
+      setUser(prev => {
+        if (!prev) return prev;
+        if (prev.role === 'doctor') {
+          return {
+            ...prev,
+            name: updatedClinic.doctorName || prev.name,
+            phone: updatedClinic.phone || prev.phone,
+            email: updatedClinic.email || prev.email
+          };
+        }
+        return prev;
+      });
+    }
   };
 
   const value = {

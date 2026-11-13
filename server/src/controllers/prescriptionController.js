@@ -98,8 +98,8 @@ export const prescriptionController = {
         status, // 'draft' or 'approved'
         doctorDetails: {
           id: req.user.id,
-          name: req.user.name,
-          qualification: clinic?.doctorName || 'M.D. (Medicine)',
+          name: clinic?.doctorName || req.user.name,
+          qualification: clinic?.tagline || 'General Physician & Family Medicine',
           regNo: clinic?.doctorRegNo || 'MCI Registered'
         },
         clinicDetails: {

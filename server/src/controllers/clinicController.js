@@ -56,15 +56,38 @@ export const clinicController = {
 
       const updated = await dbService.updateDocument('clinicSettings', clinicId, updates);
 
+      // Synchronize doctor user profile in users collection so req.user.name and auth endpoints immediately reflect the doctor's name and phone
+      let updatedUser = null;
+      if (req.user && req.user.role === 'doctor') {
+        const userUpdates = {};
+        if (doctorName && doctorName.trim()) {
+          userUpdates.name = doctorName.trim();
+        }
+        if (phone && phone.trim()) {
+          userUpdates.phone = phone.trim();
+        }
+        if (email && email.trim()) {
+          userUpdates.email = email.trim();
+        }
+        if (Object.keys(userUpdates).length > 0) {
+          try {
+            updatedUser = await dbService.updateDocument('users', req.user.id, userUpdates);
+            req.user.name = userUpdates.name || req.user.name;
+          } catch (uErr) {
+            console.warn('Could not sync user profile with clinic settings:', uErr.message);
+          }
+        }
+      }
+
       await logAudit({
         clinicId,
         actorId: req.user.id,
-        actorName: req.user.name,
+        actorName: updated.doctorName || req.user.name,
         actorRole: req.user.role,
         action: 'CLINIC_SETTINGS_UPDATE',
         resourceType: 'clinicSettings',
         resourceId: clinicId,
-        details: { name: updated.name, consultationFee: updated.consultationFee }
+        details: { name: updated.name, doctorName: updated.doctorName, address: updated.address }
       });
 
       return res.json(updated);

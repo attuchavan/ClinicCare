@@ -22,21 +22,26 @@ export const pdfService = {
     doc.setTextColor(255, 255, 255);
     doc.setFont('helvetica', 'bold');
     doc.setFontSize(18);
-    doc.text(clinic.name || rx.clinicDetails?.name || 'CITY CARE FAMILY CLINIC', 14, 13);
+    doc.text(clinic.name || rx.clinicDetails?.name || 'CLINICCARE', 14, 13);
 
     doc.setFont('helvetica', 'normal');
     doc.setFontSize(9);
-    doc.text(clinic.tagline || 'Compassionate & Comprehensive Healthcare', 14, 19);
-    doc.text(`${clinic.address || rx.clinicDetails?.address || ''} | Phone: ${clinic.phone || rx.clinicDetails?.phone || ''}`, 14, 25);
+    doc.text(clinic.tagline || rx.clinicDetails?.tagline || 'Compassionate & Comprehensive Healthcare', 14, 19);
+    const rxHeaderContact = [
+      clinic.address || rx.clinicDetails?.address || '',
+      (clinic.phone || rx.clinicDetails?.phone) ? `Phone: ${clinic.phone || rx.clinicDetails?.phone}` : ''
+    ].filter(Boolean).join(' | ');
+    doc.text(rxHeaderContact, 14, 25);
 
     // Doctor Details (Right-aligned in header)
     doc.setFont('helvetica', 'bold');
     doc.setFontSize(11);
-    doc.text(clinic.doctorName || rx.doctorDetails?.name || 'Dr. Rajesh Sharma, M.D.', 196, 13, { align: 'right' });
+    doc.text(clinic.doctorName || rx.doctorDetails?.name || 'Attending Physician', 196, 13, { align: 'right' });
     doc.setFont('helvetica', 'normal');
     doc.setFontSize(8.5);
-    doc.text(`Reg No: ${clinic.doctorRegNo || rx.doctorDetails?.regNo || 'MCI-2012-84920'}`, 196, 19, { align: 'right' });
-    doc.text('General Physician & Family Medicine', 196, 25, { align: 'right' });
+    const rxRegNo = (clinic.doctorRegNo || rx.doctorDetails?.regNo) ? `Reg No: ${clinic.doctorRegNo || rx.doctorDetails?.regNo}` : 'Registered Medical Practitioner';
+    doc.text(rxRegNo, 196, 19, { align: 'right' });
+    doc.text(clinic.tagline || 'General Physician & Family Medicine', 196, 25, { align: 'right' });
 
     // Patient Details Box
     doc.setFillColor(248, 250, 252);
@@ -167,11 +172,12 @@ export const pdfService = {
     doc.setFont('helvetica', 'bold');
     doc.setFontSize(9);
     doc.setTextColor(30, 41, 59);
-    doc.text(clinic.doctorName || rx.doctorDetails?.name || 'Dr. Rajesh Sharma', 168, footerY, { align: 'center' });
+    doc.text(clinic.doctorName || rx.doctorDetails?.name || 'Attending Physician', 168, footerY, { align: 'center' });
     doc.setFont('helvetica', 'normal');
     doc.setFontSize(7.5);
     doc.setTextColor(...grayText);
-    doc.text(`Reg: ${clinic.doctorRegNo || rx.doctorDetails?.regNo || 'MCI-2012-84920'}`, 168, footerY + 4, { align: 'center' });
+    const rxSigReg = (clinic.doctorRegNo || rx.doctorDetails?.regNo) ? `Reg: ${clinic.doctorRegNo || rx.doctorDetails?.regNo}` : 'Registered Practitioner';
+    doc.text(rxSigReg, 168, footerY + 4, { align: 'center' });
     doc.text('Digitally Approved & Signed', 168, footerY + 8, { align: 'center' });
 
     // Bottom Notice
@@ -202,20 +208,25 @@ export const pdfService = {
     doc.setTextColor(255, 255, 255);
     doc.setFont('helvetica', 'bold');
     doc.setFontSize(17);
-    doc.text(clinic.name || 'CITY CARE FAMILY CLINIC', 14, 13);
+    doc.text(clinic.name || 'CLINICCARE', 14, 13);
 
     doc.setFont('helvetica', 'normal');
     doc.setFontSize(9);
     doc.text(clinic.tagline || 'Compassionate & Comprehensive Healthcare', 14, 19);
-    doc.text(`${clinic.address || ''} | Phone: ${clinic.phone || ''}`, 14, 25);
+    const caseContact = [
+      clinic.address || '',
+      clinic.phone ? `Phone: ${clinic.phone}` : ''
+    ].filter(Boolean).join(' | ');
+    doc.text(caseContact, 14, 25);
 
     // Doctor Details (Header Right)
     doc.setFont('helvetica', 'bold');
     doc.setFontSize(11);
-    doc.text(clinic.doctorName || 'Dr. Rajesh Sharma, M.D.', 196, 13, { align: 'right' });
+    doc.text(clinic.doctorName || 'Attending Physician', 196, 13, { align: 'right' });
     doc.setFont('helvetica', 'normal');
     doc.setFontSize(8.5);
-    doc.text(`Reg No: ${clinic.doctorRegNo || 'MCI-2012-84920'}`, 196, 19, { align: 'right' });
+    const caseRegNo = clinic.doctorRegNo ? `Reg No: ${clinic.doctorRegNo}` : 'Registered Medical Practitioner';
+    doc.text(caseRegNo, 196, 19, { align: 'right' });
     doc.text('OPD Case Paper & Consultation Sheet', 196, 25, { align: 'right' });
 
     // Patient & Vitals Information Box
@@ -352,11 +363,12 @@ export const pdfService = {
     doc.setFont('helvetica', 'bold');
     doc.setFontSize(9);
     doc.setTextColor(30, 41, 59);
-    doc.text(clinic.doctorName || 'Dr. Rajesh Sharma', 168, footerY, { align: 'center' });
+    doc.text(clinic.doctorName || 'Attending Physician', 168, footerY, { align: 'center' });
     doc.setFont('helvetica', 'normal');
     doc.setFontSize(7.5);
     doc.setTextColor(...grayText);
-    doc.text(`Reg: ${clinic.doctorRegNo || 'MCI-2012-84920'}`, 168, footerY + 4, { align: 'center' });
+    const caseSigReg = clinic.doctorRegNo ? `Reg: ${clinic.doctorRegNo}` : 'Registered Practitioner';
+    doc.text(caseSigReg, 168, footerY + 4, { align: 'center' });
     doc.text('Signature / Medical Seal', 168, footerY + 8, { align: 'center' });
 
     // Bottom Notice
@@ -384,14 +396,22 @@ export const pdfService = {
     doc.setTextColor(255, 255, 255);
     doc.setFont('helvetica', 'bold');
     doc.setFontSize(14);
-    doc.text(clinic.name || bill.clinicDetails?.name || 'CITY CARE FAMILY CLINIC', 10, 11);
+    doc.text(clinic.name || bill.clinicDetails?.name || 'CLINICCARE', 10, 11);
 
     doc.setFont('helvetica', 'normal');
     doc.setFontSize(7.5);
-    doc.text('Official Payment Receipt', 10, 17);
+    const receiptAddress = clinic.address || bill.clinicDetails?.address || 'Official Payment Receipt';
+    doc.text(receiptAddress, 10, 17);
 
     doc.setFontSize(8);
-    doc.text(`Ph: ${clinic.phone || ''}`, 138, 14, { align: 'right' });
+    const receiptPhone = clinic.phone || bill.clinicDetails?.phone;
+    if (receiptPhone) {
+      doc.text(`Ph: ${receiptPhone}`, 138, 14, { align: 'right' });
+    }
+    const receiptDoc = clinic.doctorName || bill.clinicDetails?.doctorName;
+    if (receiptDoc) {
+      doc.text(receiptDoc, 138, 18, { align: 'right' });
+    }
 
     // Receipt Meta
     doc.setFont('helvetica', 'bold');

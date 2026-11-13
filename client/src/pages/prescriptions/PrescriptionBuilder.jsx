@@ -444,12 +444,14 @@ export const PrescriptionBuilder = () => {
       <div className="printable-area hidden print:block">
         <div className="border-b-2 border-slate-900 pb-4 mb-4 flex justify-between">
           <div>
-            <h1 className="text-2xl font-bold">{clinic?.name || 'City Care Family Clinic'}</h1>
-            <p className="text-sm">{clinic?.address} | Ph: {clinic?.phone}</p>
+            <h1 className="text-2xl font-bold">{clinic?.name || 'ClinicCare'}</h1>
+            <p className="text-sm">
+              {[clinic?.address, clinic?.phone ? `Ph: ${clinic.phone}` : ''].filter(Boolean).join(' | ')}
+            </p>
           </div>
           <div className="text-right">
-            <h2 className="text-lg font-bold">{clinic?.doctorName || 'Dr. Rajesh Sharma, M.D.'}</h2>
-            <p className="text-xs">Reg No: {clinic?.doctorRegNo || 'MCI-2012-84920'}</p>
+            <h2 className="text-lg font-bold">{clinic?.doctorName || 'Attending Physician'}</h2>
+            <p className="text-xs">Reg No: {clinic?.doctorRegNo || 'Registered Medical Practitioner'}</p>
           </div>
         </div>
 
@@ -491,7 +493,7 @@ export const PrescriptionBuilder = () => {
         {followUpDate && <p className="text-xs mb-8"><strong>Follow-up on:</strong> {formatDate(followUpDate)}</p>}
 
         <div className="text-right mt-16 pt-4 border-t w-64 ml-auto">
-          <p className="font-bold text-sm">{clinic?.doctorName || 'Dr. Rajesh Sharma'}</p>
+          <p className="font-bold text-sm">{clinic?.doctorName || 'Attending Physician'}</p>
           <p className="text-xs text-slate-500">Digitally Approved</p>
         </div>
       </div>

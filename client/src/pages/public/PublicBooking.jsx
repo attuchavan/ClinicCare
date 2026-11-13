@@ -142,16 +142,16 @@ export const PublicBooking = () => {
             </div>
             <div>
               <h1 className="text-xl sm:text-2xl font-bold tracking-tight">
-                {clinic?.name || 'City Care Family Clinic'}
+                {clinic?.name || 'ClinicCare'}
               </h1>
               <p className="text-xs sm:text-sm text-teal-300">
-                {clinic?.doctorName || 'Dr. Rajesh Sharma, M.D.'} • General Physician
+                {clinic?.doctorName || 'Clinic Physician'} • {clinic?.tagline || 'General Physician'}
               </p>
             </div>
           </div>
           <div className="text-right text-xs text-slate-300 hidden sm:block">
-            <p className="font-semibold">{clinic?.phone || '+91 98765 43210'}</p>
-            <p className="text-slate-400 max-w-xs truncate">{clinic?.address || 'Station Road, Pune'}</p>
+            {clinic?.phone && <p className="font-semibold">{clinic.phone}</p>}
+            {clinic?.address && <p className="text-slate-400 max-w-xs truncate">{clinic.address}</p>}
           </div>
         </div>
       </header>
@@ -184,7 +184,7 @@ export const PublicBooking = () => {
               </div>
               <div className="flex justify-between text-sm">
                 <span className="text-slate-500">Doctor:</span>
-                <span className="font-semibold text-slate-800">{clinic?.doctorName || 'Dr. Rajesh Sharma'}</span>
+                <span className="font-semibold text-slate-800">{clinic?.doctorName || 'Attending Physician'}</span>
               </div>
               <div className="flex justify-between text-sm">
                 <span className="text-slate-500">Status:</span>
@@ -212,7 +212,7 @@ export const PublicBooking = () => {
             <div className="border-b border-slate-100 pb-5 mb-8">
               <h2 className="text-2xl font-bold text-navy-900">Book Doctor Consultation</h2>
               <p className="text-sm text-slate-500 mt-1">
-                Select your preferred date and slot to reserve a clinical consultation with Dr. Rajesh Sharma.
+                Select your preferred date and slot to reserve a clinical consultation with {clinic?.doctorName || 'our doctor'}.
               </p>
             </div>
 
